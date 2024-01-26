@@ -1,0 +1,14 @@
+{
+  "name": "ezcollectionshelper",
+  "version": "0.0.1",
+  "description": "Allows EZColllections Addon to work",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wow-eluna-ts-module": "^1.6.7"
+  }
+}

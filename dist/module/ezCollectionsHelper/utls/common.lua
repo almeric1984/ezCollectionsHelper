@@ -3,6 +3,9 @@ local __TS__Class = ____lualib.__TS__Class
 local __TS__New = ____lualib.__TS__New
 local __TS__StringSplit = ____lualib.__TS__StringSplit
 local __TS__ArraySlice = ____lualib.__TS__ArraySlice
+local __TS__StringReplace = ____lualib.__TS__StringReplace
+local __TS__StringTrimStart = ____lualib.__TS__StringTrimStart
+local __TS__StringTrimEnd = ____lualib.__TS__StringTrimEnd
 local ____exports = {}
 ____exports.Common = {}
 local Common = ____exports.Common
@@ -12,11 +15,37 @@ do
     Settings.name = "Settings"
     function Settings.prototype.____constructor(self)
     end
+    function Settings.AllowedQuality(self, quality)
+        if quality == Common.Quality.Poor and self.Config.AllowPoor == 1 then
+            return true
+        end
+        if quality == Common.Quality.Common and self.Config.AllowCommon == 1 then
+            return true
+        end
+        if quality == Common.Quality.Uncommon and self.Config.AllowUncommon == 1 then
+            return true
+        end
+        if quality == Common.Quality.Rare and self.Config.AllowRare == 1 then
+            return true
+        end
+        if quality == Common.Quality.Epic and self.Config.AllowEpic == 1 then
+            return true
+        end
+        if quality == Common.Quality.Legendary and self.Config.AllowLegendary == 1 then
+            return true
+        end
+        if quality == Common.Quality.Artifact and self.Config.AllowArtifact == 1 then
+            return true
+        end
+        if quality == Common.Quality.Heirloom and self.Config.AllowHeirloom == 1 then
+            return true
+        end
+        return false
+    end
     Settings.addonPrefix = "ezCollections"
     Settings.addonVersion = "2.4.4"
     Settings.addonCacheVersion = "nocache"
-    Settings.MinQuality = 0
-    Settings.MaxQuality = 7
+    Settings.ModulesConfPath = "etc/modules"
     Common.SearchQuery = __TS__Class()
     local SearchQuery = Common.SearchQuery
     SearchQuery.name = "SearchQuery"
@@ -46,6 +75,23 @@ do
         {id = 512, name = "Blood Elf"},
         {id = 1024, name = "Draenei"}
     }
+    Common.Quality = Quality or ({})
+    Common.Quality.Poor = 0
+    Common.Quality[Common.Quality.Poor] = "Poor"
+    Common.Quality.Common = 1
+    Common.Quality[Common.Quality.Common] = "Common"
+    Common.Quality.Uncommon = 2
+    Common.Quality[Common.Quality.Uncommon] = "Uncommon"
+    Common.Quality.Rare = 3
+    Common.Quality[Common.Quality.Rare] = "Rare"
+    Common.Quality.Epic = 4
+    Common.Quality[Common.Quality.Epic] = "Epic"
+    Common.Quality.Legendary = 5
+    Common.Quality[Common.Quality.Legendary] = "Legendary"
+    Common.Quality.Artifact = 6
+    Common.Quality[Common.Quality.Artifact] = "Artifact"
+    Common.Quality.Heirloom = 7
+    Common.Quality[Common.Quality.Heirloom] = "Heirloom"
     Common.InventorySlots = InventorySlots or ({})
     Common.InventorySlots.HEAD = 1
     Common.InventorySlots[Common.InventorySlots.HEAD] = "HEAD"
@@ -93,17 +139,17 @@ do
     end
     function Common.MaterialToArmorType(self, material)
         repeat
-            local ____switch9 = material
-            local ____cond9 = ____switch9 == 7
-            if ____cond9 then
+            local ____switch18 = material
+            local ____cond18 = ____switch18 == 7
+            if ____cond18 then
                 return 1
             end
-            ____cond9 = ____cond9 or ____switch9 == 6
-            if ____cond9 then
+            ____cond18 = ____cond18 or ____switch18 == 6
+            if ____cond18 then
                 return 4
             end
-            ____cond9 = ____cond9 or ____switch9 == 5
-            if ____cond9 then
+            ____cond18 = ____cond18 or ____switch18 == 5
+            if ____cond18 then
                 return 3
             end
             do
@@ -145,6 +191,103 @@ do
         self.SourceMask = 0
         self.RaceMask = 0
         self.ClassMask = 0
+    end
+    function Common.LoadConfig(self)
+        local result = __TS__New(Common.TransmogrificationConfig)
+        local file = io.open(____exports.Common.Settings.ModulesConfPath .. "/transmog.conf", "r")
+        local contents = {}
+        if file == nil then
+            file = io.open(____exports.Common.Settings.ModulesConfPath .. "/transmog.conf.dist", "r")
+            if file == nil then
+                print("Error: Could not load config file")
+                return
+            end
+        end
+        local section = ""
+        for line in file:lines() do
+            if string.sub(line, 0, 1) == "[" and string.sub(line, -1) == "]" then
+                section = __TS__StringReplace(
+                    __TS__StringReplace(line, "[", ""),
+                    "]",
+                    ""
+                )
+            elseif string.sub(line, 0, 1) ~= "#" and line ~= "" then
+                local key, value = table.unpack(__TS__StringSplit(line, "="))
+                key = __TS__StringTrimEnd(__TS__StringTrimStart(key))
+                value = __TS__StringTrimEnd(__TS__StringTrimStart(value))
+                contents[#contents + 1] = {section, key, value}
+            end
+        end
+        file:close()
+        print("Loading config")
+        for ____, ____value in ipairs(contents) do
+            local section = ____value[1]
+            local key = ____value[2]
+            local value = ____value[3]
+            if section == "worldserver" then
+                key = __TS__StringReplace(
+                    tostring(key),
+                    "Transmogrification.",
+                    ""
+                )
+                if type(result[key]) == "number" then
+                    result[key] = tonumber(value)
+                else
+                    result[key] = value
+                end
+            end
+        end
+        return result
+    end
+    Common.TransmogrificationConfig = __TS__Class()
+    local TransmogrificationConfig = Common.TransmogrificationConfig
+    TransmogrificationConfig.name = "TransmogrificationConfig"
+    function TransmogrificationConfig.prototype.____constructor(self)
+        self.Enable = 0
+        self.UseCollectionSystem = 0
+        self.AllowHiddenTransmog = 0
+        self.TrackUnusableItems = 0
+        self.RetroActiveAppearances = 0
+        self.ResetRetroActiveAppearancesFlag = 0
+        self.EnableTransmogInfo = 0
+        self.TransmogNpcText = 0
+        self.Allowed = ""
+        self.NotAllowed = ""
+        self.EnablePortable = 0
+        self.ScaledCostModifier = 0
+        self.CopperCost = 0
+        self.RequireToken = 0
+        self.TokenEntry = 0
+        self.TokenAmount = 0
+        self.AllowPoor = 0
+        self.AllowCommon = 0
+        self.AllowUncommon = 0
+        self.AllowRare = 0
+        self.AllowEpic = 0
+        self.AllowLegendary = 0
+        self.AllowArtifact = 0
+        self.AllowHeirloom = 0
+        self.AllowTradeable = 0
+        self.AllowMixedArmorTypes = 0
+        self.AllowMixedWeaponTypes = 0
+        self.AllowMixedWeaponHandedness = 0
+        self.AllowFishingPoles = 0
+        self.IgnoreReqRace = 0
+        self.IgnoreReqClass = 0
+        self.IgnoreReqSkill = 0
+        self.IgnoreReqSpell = 0
+        self.IgnoreReqLevel = 0
+        self.IgnoreReqEvent = 0
+        self.IgnoreReqStats = 0
+        self.EnableSets = 0
+        self.MaxSets = 0
+        self.EnableSetInfo = 0
+        self.SetNpcText = 0
+        self.SetCostModifier = 0
+        self.SetCopperCost = 0
+        self.Enable = 1
+        self.UseCollectionSystem = 1
+        self.AllowHiddenTransmog = 1
     end
 end
 return ____exports

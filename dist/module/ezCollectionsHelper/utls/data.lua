@@ -13,9 +13,25 @@ function Data.prototype.____constructor(self)
     self.skinCollectionCache = {}
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
-    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\" AND\n        Quality >= %d AND\n        Quality <= %d \n         ; "
+    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\"; "
+    self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
     self.applyTransmogQuery = "INSERT INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE FakeEntry = %d"
     self.removeTransmogQuery = "DELETE FROM custom_transmogrification where Owner = %d AND GUID = %d "
+end
+function Data.prototype.GetConfig(self)
+    local queryString = string.format(
+        self.ConfigQuery,
+        GetRealmID()
+    )
+    local query = AuthDBQuery(queryString)
+    repeat
+        do
+            Common.Settings.addonPrefix = query:GetString(0)
+            Common.Settings.addonVersion = query:GetString(1)
+            Common.Settings.addonCacheVersion = query:GetString(2)
+            Common.Settings.ModulesConfPath = query:GetString(3)
+        end
+    until not query:NextRow()
 end
 function Data.prototype.ApplyTransmog(self, playerGuid, itemGuid, fakeEntry)
     print(string.format(
@@ -51,7 +67,7 @@ function Data.prototype.CleanTransmogDb(self, playerGuid)
 end
 function Data.prototype.GetSkinCollectionList(self)
     local result = {}
-    local queryResult = WorldDBQuery(string.format(self.itemsQuery, Common.Settings.MinQuality, Common.Settings.MaxQuality))
+    local queryResult = WorldDBQuery(string.format(self.itemsQuery))
     if queryResult then
         repeat
             do
@@ -63,10 +79,13 @@ function Data.prototype.GetSkinCollectionList(self)
                 skinCollectionList.RaceMask = queryResult:GetInt32(4)
                 skinCollectionList.Name = queryResult:GetString(5)
                 skinCollectionList.VerifiedBuild = queryResult:GetInt32(6)
-                if skinCollectionList.RaceMask == -1 then
-                    skinCollectionList.RaceMask = 32767
+                skinCollectionList.Quality = queryResult:GetInt32(7)
+                if Common.Settings:AllowedQuality(skinCollectionList.Quality) then
+                    if skinCollectionList.RaceMask == -1 then
+                        skinCollectionList.RaceMask = 32767
+                    end
+                    result[skinCollectionList.Id] = skinCollectionList
                 end
-                result[skinCollectionList.Id] = skinCollectionList
             end
         until not queryResult:NextRow()
     end
@@ -114,7 +133,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
         do
             local skinCollection = self.skinCollectionCache[key]
             if skinCollection.Slot ~= slot then
-                goto __continue21
+                goto __continue24
             end
             if #query == 0 or query == nil then
                 result[#result + 1] = skinCollection.Id
@@ -127,7 +146,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
                 end
             end
         end
-        ::__continue21::
+        ::__continue24::
     end
     return result
 end

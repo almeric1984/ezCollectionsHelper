@@ -85,6 +85,8 @@ function Core.prototype.____constructor(self)
         self.Data:CleanTransmogDb(player:GetGUIDLow())
     end
     self.Data = __TS__New(Data)
+    self.Data:GetConfig()
+    Common.Settings.Config = Common:LoadConfig()
     print("Initializing EZCollectionsHelper")
     self.Data:GetSkinCollectionList()
     print("EZCollectionsHelper initialized")

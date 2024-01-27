@@ -1,4 +1,9 @@
 import { Common } from "./common";
+/** @customName GetRealmID */
+declare function FixGetRealmID(this: void): number;
+/** @customName AuthDBQuery */
+declare function FixAuthDBQuery(this: void, query : string): ElunaQuery;
+
 export class Data {
     private skinCollectionCache: {[id: number]: Common.SkinCollectionList }  = {};
     private transmogQuery =
@@ -9,14 +14,12 @@ export class Data {
     private accountQuery =
     `SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d`; // %d is the account id
 
-    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild
+    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality
         FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND 
         FlagsExtra <> 8192 AND
         FlagsExtra <> 6299648 AND
-        LOWER(name) NOT LIKE "%%test %%" AND
-        Quality >= %d AND
-        Quality <= %d 
-         ; `
+        LOWER(name) NOT LIKE "%%test %%"; `
+    private ConfigQuery = `SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;`
         
     // private itemsQuery =
     // `SELECT DISTINCT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild
@@ -37,8 +40,18 @@ export class Data {
     private applyTransmogQuery = 'INSERT INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE FakeEntry = %d';
     private removeTransmogQuery = 'DELETE FROM custom_transmogrification where Owner = %d AND GUID = %d ';
 
+    public GetConfig() {
+        let queryString = string.format(this.ConfigQuery, FixGetRealmID())
+        let query = FixAuthDBQuery(queryString);    
+        do {
+            Common.Settings.addonPrefix = query.GetString(0);
+            Common.Settings.addonVersion = query.GetString(1);
+            Common.Settings.addonCacheVersion = query.GetString(2);
+            Common.Settings.ModulesConfPath = query.GetString(3);
+        } while(query.NextRow())
+    }
+
     public ApplyTransmog(playerGuid: number, itemGuid: number, fakeEntry: number) : boolean {
-        print(string.format(this.applyTransmogQuery, itemGuid, fakeEntry, playerGuid, fakeEntry))
         CharDBQuery(string.format(this.applyTransmogQuery, itemGuid, fakeEntry, playerGuid, fakeEntry));
         return true
     }
@@ -58,7 +71,7 @@ export class Data {
     }
     public GetSkinCollectionList() : {[id: number]: Common.SkinCollectionList } {
         let result = {};
-        let queryResult = WorldDBQuery(string.format(this.itemsQuery, Common.Settings.MinQuality, Common.Settings.MaxQuality));
+        let queryResult = WorldDBQuery(string.format(this.itemsQuery));
         if (queryResult) {
             do {
                 let skinCollectionList = new Common.SkinCollectionList();
@@ -69,9 +82,13 @@ export class Data {
                 skinCollectionList.RaceMask = queryResult.GetInt32(4);
                 skinCollectionList.Name = queryResult.GetString(5);
                 skinCollectionList.VerifiedBuild = queryResult.GetInt32(6);
-                if(skinCollectionList.RaceMask == -1)
-                    skinCollectionList.RaceMask = 32767;
-                result[skinCollectionList.Id] = skinCollectionList;
+                skinCollectionList.Quality = queryResult.GetInt32(7);
+                if(Common.Settings.AllowedQuality(skinCollectionList.Quality))
+                {
+                    if(skinCollectionList.RaceMask == -1)
+                        skinCollectionList.RaceMask = 32767;
+                    result[skinCollectionList.Id] = skinCollectionList;
+                }
             } while (queryResult.NextRow());
         }
         this.skinCollectionCache = result;
@@ -142,7 +159,6 @@ export class Data {
         for (let key of Object.keys(this.skinCollectionCache)) {
             let skinCollection = this.skinCollectionCache[key];
             let data = `${skinCollection.Id}`;
-           // print(skinCollection.Slot + " = " + Common.GetInventorySlotId(slot))
             if(skinCollection.Slot == Common.GetInventorySlotId(slot)) {
                 let classMask = Data.IntToHexClass(skinCollection.ClassMask);
                 let raceMask = Data.IntToHexRace(skinCollection.RaceMask);

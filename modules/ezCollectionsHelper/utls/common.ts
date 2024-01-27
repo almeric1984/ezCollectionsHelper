@@ -1,11 +1,33 @@
+
 export namespace Common {
 
     export class Settings {
-        public static readonly addonPrefix = "ezCollections";
-        public static readonly addonVersion = "2.4.4";
-        public static readonly addonCacheVersion = "nocache";
-        public static readonly MinQuality = 0;
-        public static readonly MaxQuality = 7;
+        public static addonPrefix = "ezCollections";
+        public static addonVersion = "2.4.4";
+        public static addonCacheVersion = "nocache";
+        public static ModulesConfPath = "etc/modules";
+        public static Config : TransmogrificationConfig;
+
+        public static AllowedQuality(quality: number) : boolean {
+            if(quality == Quality.Poor && this.Config.AllowPoor == 1)
+                return true;
+            if(quality == Quality.Common && this.Config.AllowCommon == 1)
+                return true;
+            if(quality == Quality.Uncommon && this.Config.AllowUncommon == 1)
+                return true;
+            if(quality == Quality.Rare && this.Config.AllowRare == 1)
+                return true;
+            if(quality == Quality.Epic && this.Config.AllowEpic == 1)
+                return true;
+            if(quality == Quality.Legendary && this.Config.AllowLegendary == 1)
+                return true;    
+            if(quality == Quality.Artifact && this.Config.AllowArtifact == 1)
+                return true;
+            if(quality == Quality.Heirloom && this.Config.AllowHeirloom == 1)
+                return true;
+
+            return false;
+        }
     }
 
     export type RaceFlag = {
@@ -49,7 +71,17 @@ export namespace Common {
         { id: 1024, name: "Draenei" }
     ];
 
-    
+    export enum Quality {
+        Poor = 0,
+        Common = 1,
+        Uncommon = 2,
+        Rare = 3,
+        Epic = 4,
+        Legendary = 5,
+        Artifact = 6,
+        Heirloom = 7
+    }
+
     export enum InventorySlots
     {
         HEAD        = 1,
@@ -136,6 +168,112 @@ export namespace Common {
         public Unobtainable: boolean;
         public Unuseable: boolean;
         public Holiday: number
+        public Quality: number;
     }
 
+    export function LoadConfig() : TransmogrificationConfig{
+
+        let result = new TransmogrificationConfig();
+        let [file] = io.open(Common.Settings.ModulesConfPath + "/transmog.conf", "r");
+        let contents = [];
+        if(file == null)
+        {
+            [file] = io.open(Common.Settings.ModulesConfPath + "/transmog.conf.dist", "r");
+            if(file == null)
+            {
+                print("Error: Could not load config file")
+                return;
+            }
+        }
+        let section = "";
+        for(let [line] of file.lines())
+        {
+            // if line is a ini section store to section variable
+            if(string.sub(line, 0, 1) == "[" && string.sub(line, -1) == "]")
+            {
+                section = line.replace("[", "").replace("]", "");
+            }
+            else if(string.sub(line, 0, 1) != "#" && line != "")
+            {
+                
+                let [key, value] = line.split("=");
+                key = key.trimStart().trimEnd();
+                value = value.trimStart().trimEnd();
+                contents.push([section, key, value]);
+          
+            }            
+        }
+        file.close();
+        //loop though contents and set config values
+        for(let [section, key, value] of contents)
+        {
+            if(section == "worldserver")
+            {
+                key = tostring(key).replace("Transmogrification.", "");
+
+                if(typeof result[key] == "number"){
+                    result[key] = tonumber(value);
+                }
+                else {
+                    result[key] = value;
+                }                
+            }
+        }
+        return result;
+    }
+    
+    export class TransmogrificationConfig {
+        public Enable: number = 0;
+        public UseCollectionSystem: number = 0;
+        public AllowHiddenTransmog: number = 0;
+        public TrackUnusableItems: number = 0;
+        public RetroActiveAppearances: number = 0;
+        public ResetRetroActiveAppearancesFlag: number = 0;
+        public EnableTransmogInfo: number = 0;
+        public TransmogNpcText: number = 0;
+        public Allowed: string = "";
+        public NotAllowed: string = "";
+        public EnablePortable: number = 0;
+        public ScaledCostModifier: number = 0;
+        public CopperCost: number = 0;
+        public RequireToken: number = 0;
+        public TokenEntry: number = 0;
+        public TokenAmount: number = 0;
+        public AllowPoor: number = 0;
+        public AllowCommon: number = 0;
+        public AllowUncommon: number = 0;
+        public AllowRare: number = 0;
+        public AllowEpic: number = 0;
+        public AllowLegendary: number = 0;
+        public AllowArtifact: number = 0;
+        public AllowHeirloom: number = 0;
+        public AllowTradeable: number = 0;
+        public AllowMixedArmorTypes: number = 0;
+        public AllowMixedWeaponTypes: number = 0;
+        public AllowMixedWeaponHandedness: number = 0;
+        public AllowFishingPoles: number = 0;
+        public IgnoreReqRace: number = 0;
+        public IgnoreReqClass: number = 0;
+        public IgnoreReqSkill: number = 0;
+        public IgnoreReqSpell: number = 0;
+        public IgnoreReqLevel: number = 0;
+        public IgnoreReqEvent: number = 0;
+        public IgnoreReqStats: number = 0;
+        public EnableSets: number = 0;
+        public MaxSets: number = 0;
+        public EnableSetInfo: number = 0;
+        public SetNpcText: number = 0;
+        public SetCostModifier: number = 0;
+        public SetCopperCost: number = 0;
+    
+        constructor() {
+            // Initialize default values
+            this.Enable = 1;
+            this.UseCollectionSystem = 1;
+            this.AllowHiddenTransmog = 1;
+            // ... Initialize other properties with their default values
+        }
+        // You can add methods to load from a file, validate, etc.
+    }
+    
 }

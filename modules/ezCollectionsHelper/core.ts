@@ -59,7 +59,6 @@ class Core {
                 RunCommand(`transmog reload ${sender.GetName()}`);
                 // Delete transmogs that are no longer changed
 
-                print("Works correctly")
                 this.GetCurrentTransmog(request, sender, messageHandler);            
             }
             else if (request.command == "GETTRANSMOG" && request.subCommand == "ALL") {
@@ -84,6 +83,8 @@ class Core {
     }
     constructor() {
         this.Data = new Data();
+        this.Data.GetConfig()
+        Common.Settings.Config = Common.LoadConfig();
         print("Initializing EZCollectionsHelper")
         this.Data.GetSkinCollectionList();
         print("EZCollectionsHelper initialized")

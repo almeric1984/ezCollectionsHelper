@@ -5,7 +5,7 @@ declare function FixGetRealmID(this: void): number;
 declare function FixAuthDBQuery(this: void, query : string): ElunaQuery;
 
 export class Data {
-    private skinCollectionCache: {[id: number]: Common.SkinCollectionList }  = {};
+    public skinCollectionCache: {[id: number]: Common.SkinCollectionList }  = {};
     private transmogQuery =
     `SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification
 	INNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid
@@ -14,7 +14,7 @@ export class Data {
     private accountQuery =
     `SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d`; // %d is the account id
 
-    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality
+    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice
         FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND 
         FlagsExtra <> 8192 AND
         FlagsExtra <> 6299648 AND
@@ -83,6 +83,7 @@ export class Data {
                 skinCollectionList.Name = queryResult.GetString(5);
                 skinCollectionList.VerifiedBuild = queryResult.GetInt32(6);
                 skinCollectionList.Quality = queryResult.GetInt32(7);
+                skinCollectionList.SellPrice = queryResult.GetInt32(8);
                 if(Common.Settings.AllowedQuality(skinCollectionList.Quality))
                 {
                     if(skinCollectionList.RaceMask == -1)

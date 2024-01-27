@@ -219,7 +219,6 @@ do
             end
         end
         file:close()
-        print("Loading config")
         for ____, ____value in ipairs(contents) do
             local section = ____value[1]
             local key = ____value[2]

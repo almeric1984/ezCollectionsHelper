@@ -169,6 +169,7 @@ export namespace Common {
         public Unuseable: boolean;
         public Holiday: number
         public Quality: number;
+        public SellPrice: number;
     }
 
     export function LoadConfig() : TransmogrificationConfig{

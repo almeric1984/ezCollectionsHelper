@@ -24,18 +24,50 @@ function Core.prototype.____constructor(self)
                 self:BuildOwnedSkinList(request, sender, messageHandler)
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "COST" then
                 local data = request.data
-                local dataRaw = ""
+                local price = 0
                 do
-                    local i = 0
+                    local i = 1
                     while i < #data do
-                        dataRaw = dataRaw .. ":" .. data[i + 1]
+                        do
+                            local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
+                            if tonumber(newSkin) == -1 then
+                                goto __continue9
+                            end
+                            local itemPrice = self:GetTransmogCost(newSkin)
+                            price = price + itemPrice
+                        end
+                        ::__continue9::
                         i = i + 1
                     end
                 end
-                messageHandler:Send(sender, "TRANSMOGRIFY:COST:OK:1000:1000" .. dataRaw, Common.Settings.addonPrefix)
+                messageHandler:Send(
+                    sender,
+                    (("TRANSMOGRIFY:COST:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
+                    Common.Settings.addonPrefix
+                )
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "APPLY" then
                 local data = request.data
                 local toDelete = {}
+                local price = 0
+                do
+                    local i = 1
+                    while i < #data do
+                        local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
+                        if tonumber(newSkin) ~= -1 then
+                            local itemPrice = self:GetTransmogCost(newSkin)
+                            price = price + itemPrice
+                        end
+                        i = i + 1
+                    end
+                end
+                if sender:GetCoinage() < price then
+                    messageHandler:Send(
+                        sender,
+                        "TRANSMOGRIFY:APPLY:FAIL:0:0:" .. table.concat(data, ":"),
+                        Common.Settings.addonPrefix
+                    )
+                    return
+                end
                 do
                     local i = 1
                     while i < #data do
@@ -60,13 +92,13 @@ function Core.prototype.____constructor(self)
                         i = i + 1
                     end
                 end
+                sender:ModifyMoney(-price)
                 messageHandler:Send(
                     sender,
-                    "TRANSMOGRIFY:APPLY:OK:1000:1000:" .. table.concat(data, ":"),
+                    (("TRANSMOGRIFY:APPLY:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
                     Common.Settings.addonPrefix
                 )
                 RunCommand("transmog reload " .. sender:GetName())
-                print("Works correctly")
                 self:GetCurrentTransmog(request, sender, messageHandler)
             elseif request.command == "GETTRANSMOG" and request.subCommand == "ALL" then
                 self:GetCurrentTransmog(request, sender, messageHandler)
@@ -90,6 +122,15 @@ function Core.prototype.____constructor(self)
     print("Initializing EZCollectionsHelper")
     self.Data:GetSkinCollectionList()
     print("EZCollectionsHelper initialized")
+end
+function Core.prototype.GetTransmogCost(self, newSkin)
+    local sellPrice = self.Data.skinCollectionCache[tonumber(newSkin)].SellPrice
+    local itemPrice = 0
+    itemPrice = sellPrice < 10000 and 10000 or sellPrice
+    itemPrice = itemPrice * Common.Settings.Config.ScaledCostModifier
+    itemPrice = itemPrice + Common.Settings.Config.CopperCost
+    itemPrice = math.floor(itemPrice)
+    return itemPrice
 end
 function Core.prototype.GetCurrentTransmog(self, request, sender, messageHandler)
     local slot = request.data

@@ -28,22 +28,45 @@ class Core {
             }
             else if(request.command == "TRANSMOGRIFY" && request.subCommand == "COST") {
                 let data = request.data as string[];
-
-                let dataRaw = ""
-                for (let i = 0; i < data.length; i++) {
-                    // DO LOGIC HERE FOR CALUCLATING COST
-                    dataRaw +=  ":" + data[i]
+                let price = 0;
+                for (let i = 1; i < data.length; i++) {
+                    let [slotAndEntry, unk1, oldSkin, unk3, newSkin]   = data[i].split(",")
+                    if(tonumber(newSkin) == -1)
+                        continue;
+                    let itemPrice = this.GetTransmogCost(newSkin);             
+                    price += itemPrice;
                 }
-                messageHandler.Send(sender, `TRANSMOGRIFY:COST:OK:1000:1000${dataRaw}`, Common.Settings.addonPrefix)
+                messageHandler.Send(sender, `TRANSMOGRIFY:COST:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
             }
             else if(request.command == "TRANSMOGRIFY" && request.subCommand == "APPLY") {
                 let data = request.data as string[];
                 let toDelete = []
+                let price = 0;
+
+                for (let i = 1; i < data.length; i++) {
+                    let [slotAndEntry, unk1, oldSkin, unk3, newSkin]   = data[i].split(",")
+                    if(tonumber(newSkin) != -1)
+                    {
+                        let itemPrice = this.GetTransmogCost(newSkin);     
+                        price += itemPrice;
+                    }
+                }
+                
+                if(sender.GetCoinage() < price)
+                {
+                    // Fails if player doesn't have enough gold
+                    // This will just stop the transmog from happening will not throw an error
+                    // TODO: slot=reason array
+                    messageHandler.Send(sender, `TRANSMOGRIFY:APPLY:FAIL:0:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                    return;
+                }
+
                 for (let i = 1; i < data.length; i++) {
                     let [slotAndEntry, unk1, oldSkin, unk3, newSkin]   = data[i].split(",")
                     let fakeEntry = tonumber(newSkin)
                     let [slot, entry] = slotAndEntry.split("=")
                     let item = sender.GetEquippedItemBySlot(tonumber(slot) -1 );
+                    
                     if(tonumber(fakeEntry) == -1)
                     {
                         this.Data.ApplyTransmog(sender.GetGUIDLow(), item.GetGUIDLow(), tonumber(entry))
@@ -55,11 +78,11 @@ class Core {
                     }
                     
                 }
-                messageHandler.Send(sender, `TRANSMOGRIFY:APPLY:OK:1000:1000:${data.join(":")}`, Common.Settings.addonPrefix)
-                RunCommand(`transmog reload ${sender.GetName()}`);
-                // Delete transmogs that are no longer changed
 
-                this.GetCurrentTransmog(request, sender, messageHandler);            
+                sender.ModifyMoney(-price);
+                messageHandler.Send(sender, `TRANSMOGRIFY:APPLY:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                RunCommand(`transmog reload ${sender.GetName()}`);
+                this.GetCurrentTransmog(request, sender, messageHandler);   
             }
             else if (request.command == "GETTRANSMOG" && request.subCommand == "ALL") {
                 this.GetCurrentTransmog(request, sender, messageHandler);
@@ -88,6 +111,17 @@ class Core {
         print("Initializing EZCollectionsHelper")
         this.Data.GetSkinCollectionList();
         print("EZCollectionsHelper initialized")
+    }
+
+    private GetTransmogCost(newSkin: string) {
+        let sellPrice = this.Data.skinCollectionCache[tonumber(newSkin)].SellPrice;
+        let itemPrice = 0;
+        // This is exactly like mod_transmog
+        itemPrice = sellPrice < 10000 ? 10000 : sellPrice;
+        itemPrice *= Common.Settings.Config.ScaledCostModifier;
+        itemPrice += Common.Settings.Config.CopperCost;
+        itemPrice = Math.floor(itemPrice);
+        return itemPrice;
     }
 
     private GetCurrentTransmog(request: Common.Request, sender: Player, messageHandler: MessageHandler) {

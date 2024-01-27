@@ -13,7 +13,7 @@ function Data.prototype.____constructor(self)
     self.skinCollectionCache = {}
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
-    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\"; "
+    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\"; "
     self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
     self.applyTransmogQuery = "INSERT INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE FakeEntry = %d"
     self.removeTransmogQuery = "DELETE FROM custom_transmogrification where Owner = %d AND GUID = %d "
@@ -34,13 +34,6 @@ function Data.prototype.GetConfig(self)
     until not query:NextRow()
 end
 function Data.prototype.ApplyTransmog(self, playerGuid, itemGuid, fakeEntry)
-    print(string.format(
-        self.applyTransmogQuery,
-        itemGuid,
-        fakeEntry,
-        playerGuid,
-        fakeEntry
-    ))
     CharDBQuery(string.format(
         self.applyTransmogQuery,
         itemGuid,
@@ -80,6 +73,7 @@ function Data.prototype.GetSkinCollectionList(self)
                 skinCollectionList.Name = queryResult:GetString(5)
                 skinCollectionList.VerifiedBuild = queryResult:GetInt32(6)
                 skinCollectionList.Quality = queryResult:GetInt32(7)
+                skinCollectionList.SellPrice = queryResult:GetInt32(8)
                 if Common.Settings:AllowedQuality(skinCollectionList.Quality) then
                     if skinCollectionList.RaceMask == -1 then
                         skinCollectionList.RaceMask = 32767

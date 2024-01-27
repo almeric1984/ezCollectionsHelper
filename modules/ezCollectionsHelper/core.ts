@@ -31,7 +31,7 @@ class Core {
                 let price = 0;
                 for (let i = 1; i < data.length; i++) {
                     let [slotAndEntry, unk1, oldSkin, unk3, newSkin]   = data[i].split(",")
-                    if(tonumber(newSkin) == -1)
+                    if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
                         continue;
                     let itemPrice = this.GetTransmogCost(newSkin);             
                     price += itemPrice;
@@ -45,7 +45,7 @@ class Core {
 
                 for (let i = 1; i < data.length; i++) {
                     let [slotAndEntry, unk1, oldSkin, unk3, newSkin]   = data[i].split(",")
-                    if(tonumber(newSkin) != -1)
+                    if(tonumber(newSkin) != -1 && tonumber(newSkin) != 15)
                     {
                         let itemPrice = this.GetTransmogCost(newSkin);     
                         price += itemPrice;
@@ -71,6 +71,10 @@ class Core {
                     {
                         this.Data.ApplyTransmog(sender.GetGUIDLow(), item.GetGUIDLow(), tonumber(entry))
                         toDelete.push(item.GetGUIDLow())
+                    }
+                    else if(tonumber(fakeEntry) == 15)
+                    {
+                        this.Data.ApplyTransmog(sender.GetGUIDLow(), item.GetGUIDLow(), 1)
                     }
                     else
                     {
@@ -141,9 +145,9 @@ class Core {
         let data = request.data as string[];
         let take = 0;
         let searchQuery = Common.DataToSearchQuery(data);
-        let results = this.Data.SearchAppearances(searchQuery.query, searchQuery.slotIndex, sender.GetAccountId());
-        let responce = `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:RESULTS:`;
-        messageHandler.Send(sender, `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:OK:${results.length}`, Common.Settings.addonPrefix);
+        let results = this.Data.SearchAppearances(searchQuery.query, searchQuery.slot, sender.GetAccountId());
+        let responce = `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:RESULTS:15:`;
+        messageHandler.Send(sender, `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:OK:${results.length + 1}`, Common.Settings.addonPrefix);
         for (let i = 0; i < results.length; i++) {
             if (take > 30) {
                 messageHandler.Send(sender, responce, Common.Settings.addonPrefix);
@@ -160,7 +164,7 @@ class Core {
     private BuildOwnedSkinList(request: Common.Request, sender: Player, messageHandler: MessageHandler) {
         let take = 0;
         let slot = request.data as string;
-        let responce = `LIST:SKIN:`;
+        let responce = `LIST:SKIN:15:`;
         let slotItems = this.Data.GetAccountUnlockedAppearances(sender.GetAccountId());
         for (let i = 0; i < slotItems.length; i++) {
             if (take == 10) {

@@ -13,7 +13,7 @@ function Data.prototype.____constructor(self)
     self.skinCollectionCache = {}
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
-    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\"; "
+    self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\" AND\n        LOWER(name) NOT LIKE \"%%npc equip%%\"; "
     self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
     self.applyTransmogQuery = "INSERT INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE FakeEntry = %d"
     self.removeTransmogQuery = "DELETE FROM custom_transmogrification where Owner = %d AND GUID = %d "
@@ -74,6 +74,8 @@ function Data.prototype.GetSkinCollectionList(self)
                 skinCollectionList.VerifiedBuild = queryResult:GetInt32(6)
                 skinCollectionList.Quality = queryResult:GetInt32(7)
                 skinCollectionList.SellPrice = queryResult:GetInt32(8)
+                skinCollectionList.Class = queryResult:GetInt32(9)
+                skinCollectionList.SubClass = queryResult:GetInt32(10)
                 if Common.Settings:AllowedQuality(skinCollectionList.Quality) then
                     if skinCollectionList.RaceMask == -1 then
                         skinCollectionList.RaceMask = 32767
@@ -98,6 +100,9 @@ function Data.prototype.GetCurrentTransmog(self, playerGuid)
                 local skinsOwned = __TS__New(Common.SkinsOwned)
                 skinsOwned.GUID = queryResult:GetInt32(0)
                 skinsOwned.FakeEntry = queryResult:GetInt32(1)
+                if skinsOwned.FakeEntry == 1 then
+                    skinsOwned.FakeEntry = 15
+                end
                 skinsOwned.RealEntry = queryResult:GetInt32(2)
                 skinsOwned.Slot = 0
                 if self.skinCollectionCache[skinsOwned.RealEntry] ~= nil then
@@ -119,6 +124,7 @@ function Data.prototype.GetAccountUnlockedAppearances(self, accountId)
             end
         until not queryResult:NextRow()
     end
+    result[#result + 1] = 15
     return result
 end
 function Data.prototype.SearchAppearances(self, query, slot, accountId)
@@ -126,8 +132,11 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
     for ____, key in ipairs(__TS__ObjectKeys(self.skinCollectionCache)) do
         do
             local skinCollection = self.skinCollectionCache[key]
-            if skinCollection.Slot ~= slot then
-                goto __continue24
+            if skinCollection.Slot ~= Common:GetInventorySlotId(slot) then
+                if slot == "SHIELD" or slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
+                else
+                    goto __continue25
+                end
             end
             if #query == 0 or query == nil then
                 result[#result + 1] = skinCollection.Id
@@ -140,7 +149,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
                 end
             end
         end
-        ::__continue24::
+        ::__continue25::
     end
     return result
 end
@@ -150,20 +159,49 @@ function Data.prototype.PackSkinCollectionList(self, slot)
         local skinCollection = self.skinCollectionCache[key]
         local data = tostring(skinCollection.Id)
         if skinCollection.Slot == Common:GetInventorySlotId(slot) then
-            local classMask = ____exports.Data:IntToHexClass(skinCollection.ClassMask)
-            local raceMask = ____exports.Data:IntToHexRace(skinCollection.RaceMask)
-            data = (data .. "I") .. tostring(Common:GetInventorySlotId(slot))
-            data = data .. "Q123"
-            data = data .. "B15990"
-            data = data .. "C5"
-            data = (data .. "A") .. tostring(Common:MaterialToArmorType(skinCollection.Type))
-            data = data .. "S0B"
-            data = (data .. "L") .. classMask
-            data = (data .. "R") .. raceMask
+            data = self:BuildSkinCollectionString(skinCollection, data, slot)
             result[#result + 1] = data
+        elseif Common:GetInventorySlotId(slot) == 0 then
+            if slot == "SHIELD" and skinCollection.Class == 4 and skinCollection.SubClass == Common.ArmorTypes.SHIELD then
+                data = self:BuildSkinCollectionString(skinCollection, data, slot)
+                result[#result + 1] = data
+            elseif slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
+                data = self:BuildSkinCollectionString(skinCollection, data, slot)
+                result[#result + 1] = data
+            end
         end
     end
+    result[#result + 1] = self:BuildHiddenItemList(slot)
     return result
+end
+function Data.prototype.BuildSkinCollectionString(self, skinCollection, data, slot)
+    local classMask = ____exports.Data:IntToHexClass(skinCollection.ClassMask)
+    local raceMask = ____exports.Data:IntToHexRace(skinCollection.RaceMask)
+    data = (data .. "I") .. tostring(Common:GetInventorySlotId(slot))
+    data = data .. "Q123"
+    data = data .. "B15990"
+    data = data .. "C5"
+    data = (data .. "A") .. tostring(Common:MaterialToArmorType(skinCollection.Type))
+    local sourceMask = self:toHex(Common.SourceMask.None)
+    data = (data .. "S") .. sourceMask
+    data = (data .. "L") .. classMask
+    data = (data .. "R") .. raceMask
+    return data
+end
+function Data.prototype.toHex(self, number)
+    if number < 0 then
+        return "-" .. string.format("%02X", number * -1)
+    else
+        return string.format("%02X", number)
+    end
+end
+function Data.prototype.BuildHiddenItemList(self, slot)
+    local data = "15"
+    data = (data .. "I") .. tostring(Common:GetInventorySlotId(slot))
+    data = (data .. "S") .. self:toHex(Common.SourceMask.None)
+    data = data .. "U"
+    data = data .. "O"
+    return data
 end
 function Data.IntToHexClass(self, value)
     if value == 32767 or value == 262143 then

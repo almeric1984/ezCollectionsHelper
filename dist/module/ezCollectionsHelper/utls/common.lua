@@ -51,6 +51,25 @@ do
     SearchQuery.name = "SearchQuery"
     function SearchQuery.prototype.____constructor(self)
     end
+    Common.SourceMask = SourceMask or ({})
+    Common.SourceMask.None = 0
+    Common.SourceMask[Common.SourceMask.None] = "None"
+    Common.SourceMask.BossDrop = 1
+    Common.SourceMask[Common.SourceMask.BossDrop] = "BossDrop"
+    Common.SourceMask.Query = 2
+    Common.SourceMask[Common.SourceMask.Query] = "Query"
+    Common.SourceMask.Vendor = 4
+    Common.SourceMask[Common.SourceMask.Vendor] = "Vendor"
+    Common.SourceMask.WorldDrop = 8
+    Common.SourceMask[Common.SourceMask.WorldDrop] = "WorldDrop"
+    Common.SourceMask.Achievement = 16
+    Common.SourceMask[Common.SourceMask.Achievement] = "Achievement"
+    Common.SourceMask.Profession = 32
+    Common.SourceMask[Common.SourceMask.Profession] = "Profession"
+    Common.SourceMask.Store = 64
+    Common.SourceMask[Common.SourceMask.Store] = "Store"
+    Common.SourceMask.Subscription = 128
+    Common.SourceMask[Common.SourceMask.Subscription] = "Subscription"
     function Common.DataToSearchQuery(self, data)
         local query = __TS__New(Common.SearchQuery)
         query.type = tonumber(data[1])
@@ -58,7 +77,7 @@ do
         query.slot = data[3]
         query.query = data[4]
         local subquery = __TS__StringSplit(data[5], ",")
-        query.slotIndex = tonumber(subquery[1])
+        query.slotIndex = self:GetInventorySlotName(query.slot)
         query.entry = tonumber(subquery[2])
         query.unknown = tonumber(subquery[3])
         return query
@@ -125,31 +144,91 @@ do
     Common.InventorySlots[Common.InventorySlots.RANGE] = "RANGE"
     Common.InventorySlots.BACK = 16
     Common.InventorySlots[Common.InventorySlots.BACK] = "BACK"
-    Common.InventorySlots.TWOHAND = 17
-    Common.InventorySlots[Common.InventorySlots.TWOHAND] = "TWOHAND"
+    Common.InventorySlots.TWO_HAND = 17
+    Common.InventorySlots[Common.InventorySlots.TWO_HAND] = "TWO_HAND"
     Common.InventorySlots.BAG = 18
     Common.InventorySlots[Common.InventorySlots.BAG] = "BAG"
     Common.InventorySlots.TABARD = 19
     Common.InventorySlots[Common.InventorySlots.TABARD] = "TABARD"
+    Common.ArmorTypes = ArmorTypes or ({})
+    Common.ArmorTypes.CLOTH = 1
+    Common.ArmorTypes[Common.ArmorTypes.CLOTH] = "CLOTH"
+    Common.ArmorTypes.LEATHER = 2
+    Common.ArmorTypes[Common.ArmorTypes.LEATHER] = "LEATHER"
+    Common.ArmorTypes.MAIL = 3
+    Common.ArmorTypes[Common.ArmorTypes.MAIL] = "MAIL"
+    Common.ArmorTypes.PLATE = 4
+    Common.ArmorTypes[Common.ArmorTypes.PLATE] = "PLATE"
+    Common.ArmorTypes.SHIELD = 6
+    Common.ArmorTypes[Common.ArmorTypes.SHIELD] = "SHIELD"
+    Common.WeaponTypes = WeaponTypes or ({})
+    Common.WeaponTypes["1H_AXE"] = 0
+    Common.WeaponTypes[Common.WeaponTypes["1H_AXE"]] = "1H_AXE"
+    Common.WeaponTypes["2H_AXE"] = 1
+    Common.WeaponTypes[Common.WeaponTypes["2H_AXE"]] = "2H_AXE"
+    Common.WeaponTypes.BOW = 2
+    Common.WeaponTypes[Common.WeaponTypes.BOW] = "BOW"
+    Common.WeaponTypes.GUN = 3
+    Common.WeaponTypes[Common.WeaponTypes.GUN] = "GUN"
+    Common.WeaponTypes["1H_MACE"] = 4
+    Common.WeaponTypes[Common.WeaponTypes["1H_MACE"]] = "1H_MACE"
+    Common.WeaponTypes["2H_MACE"] = 5
+    Common.WeaponTypes[Common.WeaponTypes["2H_MACE"]] = "2H_MACE"
+    Common.WeaponTypes.POLEARM = 6
+    Common.WeaponTypes[Common.WeaponTypes.POLEARM] = "POLEARM"
+    Common.WeaponTypes["1H_SWORD"] = 7
+    Common.WeaponTypes[Common.WeaponTypes["1H_SWORD"]] = "1H_SWORD"
+    Common.WeaponTypes["2H_SWORD"] = 8
+    Common.WeaponTypes[Common.WeaponTypes["2H_SWORD"]] = "2H_SWORD"
+    Common.WeaponTypes.STAFF = 10
+    Common.WeaponTypes[Common.WeaponTypes.STAFF] = "STAFF"
+    Common.WeaponTypes.FIST = 13
+    Common.WeaponTypes[Common.WeaponTypes.FIST] = "FIST"
+    Common.WeaponTypes.MISC = 14
+    Common.WeaponTypes[Common.WeaponTypes.MISC] = "MISC"
+    Common.WeaponTypes.DAGGER = 15
+    Common.WeaponTypes[Common.WeaponTypes.DAGGER] = "DAGGER"
+    Common.WeaponTypes.THROWN = 16
+    Common.WeaponTypes[Common.WeaponTypes.THROWN] = "THROWN"
+    Common.WeaponTypes.SPEAR = 17
+    Common.WeaponTypes[Common.WeaponTypes.SPEAR] = "SPEAR"
+    Common.WeaponTypes.CROSSBOW = 18
+    Common.WeaponTypes[Common.WeaponTypes.CROSSBOW] = "CROSSBOW"
+    Common.WeaponTypes.WAND = 19
+    Common.WeaponTypes[Common.WeaponTypes.WAND] = "WAND"
+    Common.WeaponTypes.FISHING_POLE = 20
+    Common.WeaponTypes[Common.WeaponTypes.FISHING_POLE] = "FISHING_POLE"
     function Common.GetInventorySlotId(self, slotName)
+        if not Common.InventorySlots[string.upper(slotName)] then
+            return 0
+        end
         return Common.InventorySlots[string.upper(slotName)]
     end
+    function Common.GetWeaponTypeNameById(self, weaponType)
+        if not Common.WeaponTypes[weaponType] then
+            return "UNKNOWN"
+        end
+        return Common.WeaponTypes[weaponType]
+    end
     function Common.GetInventorySlotName(self, slotId)
+        if not Common.InventorySlots[slotId] then
+            return "UNKNOWN"
+        end
         return Common.InventorySlots[slotId]
     end
     function Common.MaterialToArmorType(self, material)
         repeat
-            local ____switch18 = material
-            local ____cond18 = ____switch18 == 7
-            if ____cond18 then
+            local ____switch22 = material
+            local ____cond22 = ____switch22 == 7
+            if ____cond22 then
                 return 1
             end
-            ____cond18 = ____cond18 or ____switch18 == 6
-            if ____cond18 then
+            ____cond22 = ____cond22 or ____switch22 == 6
+            if ____cond22 then
                 return 4
             end
-            ____cond18 = ____cond18 or ____switch18 == 5
-            if ____cond18 then
+            ____cond22 = ____cond22 or ____switch22 == 5
+            if ____cond22 then
                 return 3
             end
             do

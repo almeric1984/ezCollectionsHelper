@@ -30,7 +30,7 @@ function Core.prototype.____constructor(self)
                     while i < #data do
                         do
                             local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
-                            if tonumber(newSkin) == -1 then
+                            if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
                                 goto __continue9
                             end
                             local itemPrice = self:GetTransmogCost(newSkin)
@@ -53,7 +53,7 @@ function Core.prototype.____constructor(self)
                     local i = 1
                     while i < #data do
                         local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
-                        if tonumber(newSkin) ~= -1 then
+                        if tonumber(newSkin) ~= -1 and tonumber(newSkin) ~= 15 then
                             local itemPrice = self:GetTransmogCost(newSkin)
                             price = price + itemPrice
                         end
@@ -82,6 +82,12 @@ function Core.prototype.____constructor(self)
                                 tonumber(entry)
                             )
                             toDelete[#toDelete + 1] = item:GetGUIDLow()
+                        elseif tonumber(fakeEntry) == 15 then
+                            self.Data:ApplyTransmog(
+                                sender:GetGUIDLow(),
+                                item:GetGUIDLow(),
+                                1
+                            )
                         else
                             self.Data:ApplyTransmog(
                                 sender:GetGUIDLow(),
@@ -155,13 +161,13 @@ function Core.prototype.DoSearchTransmog(self, request, sender, messageHandler)
     local searchQuery = Common:DataToSearchQuery(data)
     local results = self.Data:SearchAppearances(
         searchQuery.query,
-        searchQuery.slotIndex,
+        searchQuery.slot,
         sender:GetAccountId()
     )
-    local responce = ((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":RESULTS:"
+    local responce = ((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":RESULTS:15:"
     messageHandler:Send(
         sender,
-        (((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":OK:") .. tostring(#results),
+        (((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":OK:") .. tostring(#results + 1),
         Common.Settings.addonPrefix
     )
     do
@@ -187,7 +193,7 @@ end
 function Core.prototype.BuildOwnedSkinList(self, request, sender, messageHandler)
     local take = 0
     local slot = request.data
-    local responce = "LIST:SKIN:"
+    local responce = "LIST:SKIN:15:"
     local slotItems = self.Data:GetAccountUnlockedAppearances(sender:GetAccountId())
     do
         local i = 0

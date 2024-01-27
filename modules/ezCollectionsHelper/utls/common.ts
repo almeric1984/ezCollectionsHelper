@@ -45,6 +45,19 @@ export namespace Common {
         unknown: number;
     }
 
+    export enum SourceMask {
+        None = 0,
+        BossDrop = 1,
+        Query = 2,
+        Vendor = 4,
+        WorldDrop = 8,
+        Achievement = 16,
+        Profession = 32,
+        Store = 64,
+        Subscription = 128,
+        
+    }
+
     export function DataToSearchQuery(data : string[]) : SearchQuery {
         let query = new SearchQuery()
         query.type = tonumber(data[0])
@@ -52,7 +65,8 @@ export namespace Common {
         query.slot = data[2]
         query.query = data[3]
         let subquery = data[4].split(",")
-        query.slotIndex = tonumber(subquery[0])
+        query.slotIndex = this.GetInventorySlotName(query.slot)
+        //query.slotIndex = tonumber(subquery[0])
         query.entry = tonumber(subquery[1])
         query.unknown = tonumber(subquery[2])
         return query
@@ -100,16 +114,56 @@ export namespace Common {
         SHIELD      = 14,
         RANGE       = 15,
         BACK        = 16,
-        TWOHAND     = 17,
+        TWO_HAND    = 17,
         BAG         = 18,
-        TABARD      = 19,
+        TABARD      = 19,        
+    }
+    export enum ArmorTypes 
+    {
+        "CLOTH" = 1,
+        "LEATHER" = 2,
+        "MAIL" = 3,
+        "PLATE" = 4,
+        "SHIELD" = 6,
+    }
+    export enum WeaponTypes 
+    {
+        "1H_AXE" = 0,
+        "2H_AXE" = 1,
+        "BOW" = 2,
+        "GUN" = 3,
+        "1H_MACE" = 4,
+        "2H_MACE" = 5,
+        "POLEARM" = 6,
+        "1H_SWORD" = 7,
+        "2H_SWORD" = 8,
+        "STAFF" = 10,
+        "FIST" = 13,
+        "MISC" = 14,
+        "DAGGER" = 15,
+        "THROWN" = 16,
+        "SPEAR" = 17,
+        "CROSSBOW" = 18,
+        "WAND" = 19,
+        "FISHING_POLE" = 20,
     }
 
     export function GetInventorySlotId(slotName: string) : number {
-        return InventorySlots[slotName.toUpperCase()]
+        if(!InventorySlots[slotName.toUpperCase()]) {
+            return 0;
+        }
+        return InventorySlots[slotName.toUpperCase()] 
     }
-
+    export function GetWeaponTypeNameById(weaponType: number) : string {
+        if(!WeaponTypes[weaponType]) {
+            return "UNKNOWN";
+        }
+        return WeaponTypes[weaponType]
+    }   
     export function GetInventorySlotName(slotId: number) : string {
+        if(!InventorySlots[slotId]) {
+            return "UNKNOWN";
+        }
         return InventorySlots[slotId]
     }
     export function MaterialToArmorType(material: number) : number {
@@ -170,6 +224,8 @@ export namespace Common {
         public Holiday: number
         public Quality: number;
         public SellPrice: number;
+        public Class: number;
+        public SubClass: number;
     }
 
     export function LoadConfig() : TransmogrificationConfig{

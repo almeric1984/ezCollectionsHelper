@@ -14,11 +14,12 @@ export class Data {
     private accountQuery =
     `SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d`; // %d is the account id
 
-    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice
+    private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass
         FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND 
         FlagsExtra <> 8192 AND
         FlagsExtra <> 6299648 AND
-        LOWER(name) NOT LIKE "%%test %%"; `
+        LOWER(name) NOT LIKE "%%test %%" AND
+        LOWER(name) NOT LIKE "%%npc equip%%"; `
     private ConfigQuery = `SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;`
         
     // private itemsQuery =
@@ -84,6 +85,8 @@ export class Data {
                 skinCollectionList.VerifiedBuild = queryResult.GetInt32(6);
                 skinCollectionList.Quality = queryResult.GetInt32(7);
                 skinCollectionList.SellPrice = queryResult.GetInt32(8);
+                skinCollectionList.Class = queryResult.GetInt32(9);
+                skinCollectionList.SubClass = queryResult.GetInt32(10);
                 if(Common.Settings.AllowedQuality(skinCollectionList.Quality))
                 {
                     if(skinCollectionList.RaceMask == -1)
@@ -92,6 +95,7 @@ export class Data {
                 }
             } while (queryResult.NextRow());
         }
+        
         this.skinCollectionCache = result;
         return result;
     }
@@ -107,6 +111,9 @@ export class Data {
                 let skinsOwned = new Common.SkinsOwned();
                 skinsOwned.GUID = queryResult.GetInt32(0);
                 skinsOwned.FakeEntry = queryResult.GetInt32(1);
+                //Update hidden fake id to 15
+                if(skinsOwned.FakeEntry == 1)
+                    skinsOwned.FakeEntry = 15;
                 skinsOwned.RealEntry = queryResult.GetInt32(2);
                 skinsOwned.Slot = 0;
                 if(this.skinCollectionCache[skinsOwned.RealEntry] !== undefined) {
@@ -126,17 +133,26 @@ export class Data {
                 result.push(queryResult.GetInt32(0));
             } while (queryResult.NextRow());
         }
+        result.push(15);
         return result;
     }
 
-    public SearchAppearances(query: string, slot : number, accountId : number) : any[]
+    public SearchAppearances(query: string, slot : string, accountId : number) : any[]
     {
         let result = [];
         //Search Collections
         for (let key of Object.keys(this.skinCollectionCache)) {
             let skinCollection = this.skinCollectionCache[key];
-            if(skinCollection.Slot != slot){
-                continue;
+            if(skinCollection.Slot != Common.GetInventorySlotId(slot)){
+                // TODO Clean this up
+                if(slot == "SHIELD" || (slot == Common.GetWeaponTypeNameById(skinCollection.SubClass) && skinCollection.Class == 2))
+                {
+
+                }
+                else
+                {
+                    continue;
+                }
             }
             if((query.length === 0 || query === undefined))
             {
@@ -151,7 +167,7 @@ export class Data {
                 }
             }
         }
-
+        
         return result;
     }
 
@@ -160,38 +176,81 @@ export class Data {
         for (let key of Object.keys(this.skinCollectionCache)) {
             let skinCollection = this.skinCollectionCache[key];
             let data = `${skinCollection.Id}`;
+            
+            //Handles Common Armor
             if(skinCollection.Slot == Common.GetInventorySlotId(slot)) {
-                let classMask = Data.IntToHexClass(skinCollection.ClassMask);
-                let raceMask = Data.IntToHexRace(skinCollection.RaceMask);
-                data = `${data}I${Common.GetInventorySlotId(slot)}`;
-                // if(skinCollection.QuestIds.length > 0)
-                //     data = `${data}Q${skinCollection.QuestIds.join('Q')}`;
-                data = `${data}Q123`;
-                data = `${data}B15990`;
-                data = `${data}C5`;
-                // if(skinCollection.BossIds.length > 0)
-                //     data = `${data}B${skinCollection.BossIds.join('B')}`;
-                // if(skinCollection.Camra != "")
-                //     data = `${data}C${skinCollection.Camra}`;
-                // if(skinCollection.Unuseable)
-                //     data = `${data}U` ;
-                // if(skinCollection.Unobtainable)
-                //     data = `${data}O`;
-                /// Add Enchantable E and is weapon W later
-                data = `${data}A${Common.MaterialToArmorType(skinCollection.Type)}`;
-                data = `${data}S0B`;
-                //data = `${data}S${skinCollection.SourceMask}`;
-                data = `${data}L${classMask}`;
-                data = `${data}R${raceMask}`;
-                //data = `${data}R${skinCollection.RaceMask}`;
-                //data = `${data}T${skinCollection.Icon}`;
-                // Add Expansion X = WOTLK x = BC none = classic later
+                data = this.BuildSkinCollectionString(skinCollection, data, slot);
                 result.push(data);
             }
+            //Handles Weapons and Shields
+            else if(Common.GetInventorySlotId(slot) == 0)
+            {
+                if(slot == "SHIELD" && skinCollection.Class == 4 && skinCollection.SubClass == Common.ArmorTypes.SHIELD)
+                {
+                    data = this.BuildSkinCollectionString(skinCollection, data, slot);
+                    result.push(data);
+                }
+                else if(slot == Common.GetWeaponTypeNameById(skinCollection.SubClass) && skinCollection.Class == 2) 
+                {
+                    data = this.BuildSkinCollectionString(skinCollection, data, slot);
+                    result.push(data);
+                }
+            }
         }
+        result.push(this.BuildHiddenItemList(slot)); 
         return result;
     }
+    
+    private BuildSkinCollectionString(skinCollection: any, data: string, slot: string) {
+        let classMask = Data.IntToHexClass(skinCollection.ClassMask);
+        let raceMask = Data.IntToHexRace(skinCollection.RaceMask);
+        data = `${data}I${Common.GetInventorySlotId(slot)}`;
+        // if(skinCollection.QuestIds.length > 0)
+        //     data = `${data}Q${skinCollection.QuestIds.join('Q')}`;
+        data = `${data}Q123`;
+        data = `${data}B15990`;
+        data = `${data}C5`;
+        // if(skinCollection.BossIds.length > 0)
+        //     data = `${data}B${skinCollection.BossIds.join('B')}`;
+        // if(skinCollection.Camra != "")
+        //     data = `${data}C${skinCollection.Camra}`;
+        // if(skinCollection.Unuseable)
+        //     data = `${data}U` ;
+        // if(skinCollection.Unobtainable)
+        //     data = `${data}O`;
+        /// Add Enchantable E and is weapon W later
+        data = `${data}A${Common.MaterialToArmorType(skinCollection.Type)}`;
+        let sourceMask = this.toHex(Common.SourceMask.None);
+        data = `${data}S${sourceMask}`;
+        //data = `${data}S${skinCollection.SourceMask}`;
+        data = `${data}L${classMask}`;
+        data = `${data}R${raceMask}`;
+        //data = `${data}R${skinCollection.RaceMask}`;
+        //data = `${data}T${skinCollection.Icon}`;
+        // Add Expansion X = WOTLK x = BC none = classic later
+        return data;
+    }
 
+    toHex(number: number): string {
+        if(number < 0) {
+            return "-" + string.format("%02X", number * -1)
+        }
+        else
+        {
+            return string.format("%02X", number)
+        }
+    }
+
+    public BuildHiddenItemList(slot : string) : string {
+        let data = `15`;
+        data = `${data}I${Common.GetInventorySlotId(slot)}`;
+        data = `${data}S${this.toHex(Common.SourceMask.None)}`;
+        data = `${data}U`;
+        data = `${data}O`;
+        
+        //data = `${data}TH`;
+        return data;
+    }
 
     private static IntToHexClass(value: number): string {
         // Corrects for any class flag

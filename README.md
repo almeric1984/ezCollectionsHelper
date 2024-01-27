@@ -5,7 +5,7 @@ This is very much in alpha and should not be used in production. 2.4.4 addon ver
 
 ## Install
 1) clone repo
-2) Insert sql/auth.sql into auth database
+2) Insert sql/auth.sql into auth database ```On Windows working directory might be bin so add ../ or use full path to modules config folder```
 3) Config the above if need
 ``` Note step 4 isn't required if you already have this file from another  lua script```
 4) copy dist/common/lualib_bundle.lua to lua_scripts/common/lualib_bundle.lua

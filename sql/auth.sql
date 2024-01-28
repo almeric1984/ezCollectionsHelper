@@ -29,4 +29,4 @@ CREATE TABLE IF NOT EXISTS `custom_ezCollectionsHelperConfig` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO `custom_ezCollectionsHelperConfig` (`RealmID`, `Prefix`, `Version`, `CacheVersion`, `ModulesConfPath`, `AllowedToHide`) VALUES
-	(2, 'ezCollections', '2.4.4', 'noca2che7', 'etc/modules', 'HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT');
+	(1, 'ezCollections', '2.4.4', 'noca2che7', 'etc/modules', 'HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT');

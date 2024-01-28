@@ -261,6 +261,11 @@ do
     SkinsOwned.name = "SkinsOwned"
     function SkinsOwned.prototype.____constructor(self)
     end
+    Common.Camera = __TS__Class()
+    local Camera = Common.Camera
+    Camera.name = "Camera"
+    function Camera.prototype.____constructor(self)
+    end
     Common.SkinCollectionList = __TS__Class()
     local SkinCollectionList = Common.SkinCollectionList
     SkinCollectionList.name = "SkinCollectionList"

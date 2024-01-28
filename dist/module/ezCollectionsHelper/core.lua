@@ -18,7 +18,9 @@ function Core.prototype.____constructor(self)
                 messageHandler:Send(sender, ("SERVERVERSION:" .. Common.Settings.addonVersion) .. ":OK", Common.Settings.addonPrefix)
                 messageHandler:Send(sender, "CACHEVERSION:" .. Common.Settings.addonCacheVersion, Common.Settings.addonPrefix)
                 messageHandler:Send(sender, "COLLECTIONS:SKIN:OWNEDITEM:END", Common.Settings.addonPrefix)
+                messageHandler:Send(sender, "HIDEVISUALSLOTS:HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT", Common.Settings.addonPrefix)
             elseif request.command == "LIST" and request.subCommand == "ALL" then
+                self:BuildCameraDataList(request, messageHandler, sender)
                 self:BuildCollectionList(request, messageHandler, sender)
             elseif request.command == "LIST" and request.subCommand == "SKIN" then
                 self:BuildOwnedSkinList(request, sender, messageHandler)
@@ -124,6 +126,7 @@ function Core.prototype.____constructor(self)
     end
     self.Data = __TS__New(Data)
     self.Data:GetConfig()
+    self.Data:BuildCameraCache()
     Common.Settings.Config = Common:LoadConfig()
     print("Initializing EZCollectionsHelper")
     self.Data:GetSkinCollectionList()
@@ -164,10 +167,10 @@ function Core.prototype.DoSearchTransmog(self, request, sender, messageHandler)
         searchQuery.slot,
         sender:GetAccountId()
     )
-    local responce = ((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":RESULTS:15:"
+    local responce = ((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":RESULTS:"
     messageHandler:Send(
         sender,
-        (((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":OK:") .. tostring(#results + 1),
+        (((("TRANSMOGRIFY:SEARCH:" .. tostring(searchQuery.type)) .. ":") .. tostring(searchQuery.token)) .. ":OK:") .. tostring(#results),
         Common.Settings.addonPrefix
     )
     do
@@ -193,7 +196,7 @@ end
 function Core.prototype.BuildOwnedSkinList(self, request, sender, messageHandler)
     local take = 0
     local slot = request.data
-    local responce = "LIST:SKIN:15:"
+    local responce = "LIST:SKIN:"
     local slotItems = self.Data:GetAccountUnlockedAppearances(sender:GetAccountId())
     do
         local i = 0
@@ -215,7 +218,7 @@ function Core.prototype.BuildCollectionList(self, request, messageHandler, sende
     local take = 0
     local slot = request.data
     local responce = ("LIST:ALL:" .. slot) .. ":"
-    local slotItems = self.Data:PackSkinCollectionList(slot)
+    local slotItems = self.Data:PackSkinCollectionList(slot, sender)
     do
         local i = 0
         while i < #slotItems do
@@ -231,6 +234,28 @@ function Core.prototype.BuildCollectionList(self, request, messageHandler, sende
     end
     messageHandler:Send(sender, responce, Common.Settings.addonPrefix)
     messageHandler:Send(sender, ("LIST:ALL:" .. slot) .. ":END", Common.Settings.addonPrefix)
+end
+function Core.prototype.BuildCameraDataList(self, request, messageHandler, sender)
+    local take = 0
+    local slot = request.data
+    local cameras = self.Data:GetCameraList()
+    local responce = "LIST:DATA:CAMERAS:"
+    do
+        local i = 0
+        while i < #cameras do
+            local c = cameras[i + 1]
+            if take == 10 then
+                messageHandler:Send(sender, responce, Common.Settings.addonPrefix)
+                responce = "LIST:DATA:CAMERAS:"
+                take = 0
+            end
+            responce = responce .. ((((((((((((((((((tostring(c.Option) .. ",") .. tostring(c.Race)) .. ",") .. tostring(c.Sex)) .. ",") .. tostring(c.Class * 100 + c.SubClass)) .. "=") .. tostring(c.X)) .. ",") .. tostring(c.Y)) .. ",") .. tostring(c.Z)) .. ",") .. tostring(c.F)) .. ",") .. tostring(c.Anim)) .. ",") .. c.Name) .. ":"
+            take = take + 1
+            i = i + 1
+        end
+    end
+    messageHandler:Send(sender, responce, Common.Settings.addonPrefix)
+    messageHandler:Send(sender, "LIST:DATA:CAMERAS:END", Common.Settings.addonPrefix)
 end
 local core = __TS__New(Core)
 RegisterPlayerEvent(

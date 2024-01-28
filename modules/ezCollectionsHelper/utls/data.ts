@@ -6,6 +6,8 @@ declare function FixAuthDBQuery(this: void, query : string): ElunaQuery;
 
 export class Data {
     public skinCollectionCache: {[id: number]: Common.SkinCollectionList }  = {};
+    public camaraCache: {[id: number]: Common.Camera }  = {};
+    private camaraQuery = "select id, `option`, race, sex, x,y,z,f, anim, name,class,subclass from custom_ezCollectionsHelperCameras;"
     private transmogQuery =
     `SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification
 	INNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid
@@ -21,7 +23,8 @@ export class Data {
         LOWER(name) NOT LIKE "%%test %%" AND
         LOWER(name) NOT LIKE "%%npc equip%%"; `
     private ConfigQuery = `SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;`
-        
+    private weaponSlotQuery = `SELECT slot FROM character_inventory WHERE item = %d`
+
     // private itemsQuery =
     // `SELECT DISTINCT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild
     //     FROM (
@@ -70,6 +73,40 @@ export class Data {
         });
         return true;
     }
+    //ezCollections.Cache.Cameras[option * ezCollections.CameraOptionsToCameraID[ezCollections.CameraOptions[1]] + race * ezCollections.RaceToCameraID.Human + sex * ezCollections.SexToCameraID[1] + id] 
+    private GetCamaraId(option: number, race: number, sex :number, id : number ){
+
+        return (option * 10000000) + (race * 100000) + (sex * 10000) + id
+    }
+    public BuildCameraCache() {
+        let queryResult = FixAuthDBQuery(string.format(this.camaraQuery));
+        if(queryResult) {   
+            do {
+                let camera = new Common.Camera();
+                camera.Id = queryResult.GetInt32(0);
+                camera.Option = queryResult.GetInt32(1);
+                camera.Race = queryResult.GetInt32(2);
+                camera.Sex = queryResult.GetInt32(3);
+                camera.X = queryResult.GetFloat(4);
+                camera.Y = queryResult.GetFloat(5);
+                camera.Z = queryResult.GetFloat(6);
+                camera.F = queryResult.GetFloat(7);
+                camera.Anim = queryResult.GetInt32(8);
+                camera.Name = queryResult.GetString(9);
+                camera.Class = queryResult.GetInt32(10);
+                camera.SubClass = queryResult.GetInt32(11);
+                this.camaraCache[this.GetCamaraId(camera.Option, camera.Race,camera.Sex, (camera.Class * 100 + camera.SubClass))] = camera;
+            } while (queryResult.NextRow());
+        }
+    }
+    public GetCameraList() : Common.Camera[]  {
+        let result = [];
+        for (let key of Object.keys(this.camaraCache)) {
+            let camera = this.camaraCache[key];
+            result.push(camera);
+        }
+        return result;
+    }
     public GetSkinCollectionList() : {[id: number]: Common.SkinCollectionList } {
         let result = {};
         let queryResult = WorldDBQuery(string.format(this.itemsQuery));
@@ -117,9 +154,22 @@ export class Data {
                 skinsOwned.RealEntry = queryResult.GetInt32(2);
                 skinsOwned.Slot = 0;
                 if(this.skinCollectionCache[skinsOwned.RealEntry] !== undefined) {
-                    skinsOwned.Slot = this.skinCollectionCache[skinsOwned.RealEntry].Slot;
+                    // If shield or weapon pull from database and figure out what slot its in
+                    if(this.skinCollectionCache[skinsOwned.RealEntry].Class == 2 || (this.skinCollectionCache[skinsOwned.RealEntry].Class == 4 && this.skinCollectionCache[skinsOwned.RealEntry].SubClass == Common.ArmorTypes.SHIELD))   
+                    {
+                        let weaponSlotQuery = CharDBQuery(string.format(this.weaponSlotQuery, skinsOwned.GUID));
+                        if (weaponSlotQuery) {
+                            do {
+                                skinsOwned.Slot = weaponSlotQuery.GetInt32(0) + 1;
+                            } while (weaponSlotQuery.NextRow());
+                        }
+                    }
+                    else
+                    {
+                        skinsOwned.Slot = this.skinCollectionCache[skinsOwned.RealEntry].Slot;
+                    }
+                    result.push(skinsOwned);
                 }
-                result.push(skinsOwned);
             } while (queryResult.NextRow());
         }
         return result;
@@ -133,7 +183,6 @@ export class Data {
                 result.push(queryResult.GetInt32(0));
             } while (queryResult.NextRow());
         }
-        result.push(15);
         return result;
     }
 
@@ -171,15 +220,31 @@ export class Data {
         return result;
     }
 
-    public PackSkinCollectionList(slot : string) : string[] {
+    public PackSkinCollectionList(slot : string, player: Player) : string[] {
         let result = [];
         for (let key of Object.keys(this.skinCollectionCache)) {
             let skinCollection = this.skinCollectionCache[key];
             let data = `${skinCollection.Id}`;
-            
+            let camera = 0;
+            let cameraId = this.GetCamaraId(1,  player.GetRace(), player.GetGender(), ( skinCollection.Class * 100 + skinCollection.SubClass ));
+            // Try to get the camera from the cache if it exists
+            if(this.camaraCache[cameraId] !== undefined)
+            {
+                camera = cameraId
+            }
+                // If that fails try to get the camera from cache using all races, all genders
+            else
+            {   
+                cameraId = this.GetCamaraId(1,  30, 3, ( skinCollection.Class * 100 + skinCollection.SubClass ));
+                if(this.camaraCache[cameraId] !== undefined)
+                {
+                    camera = cameraId
+                }
+            }
+
             //Handles Common Armor
             if(skinCollection.Slot == Common.GetInventorySlotId(slot)) {
-                data = this.BuildSkinCollectionString(skinCollection, data, slot);
+                data = this.BuildSkinCollectionString(skinCollection, data, slot,camera);
                 result.push(data);
             }
             //Handles Weapons and Shields
@@ -187,21 +252,20 @@ export class Data {
             {
                 if(slot == "SHIELD" && skinCollection.Class == 4 && skinCollection.SubClass == Common.ArmorTypes.SHIELD)
                 {
-                    data = this.BuildSkinCollectionString(skinCollection, data, slot);
+                    data = this.BuildSkinCollectionString(skinCollection, data, slot,camera);
                     result.push(data);
                 }
                 else if(slot == Common.GetWeaponTypeNameById(skinCollection.SubClass) && skinCollection.Class == 2) 
                 {
-                    data = this.BuildSkinCollectionString(skinCollection, data, slot);
+                    data = this.BuildSkinCollectionString(skinCollection, data, slot, camera, true);
                     result.push(data);
                 }
             }
         }
-        result.push(this.BuildHiddenItemList(slot)); 
         return result;
     }
     
-    private BuildSkinCollectionString(skinCollection: any, data: string, slot: string) {
+    private BuildSkinCollectionString(skinCollection: any, data: string, slot: string, camera : number , weapon: boolean = false) {
         let classMask = Data.IntToHexClass(skinCollection.ClassMask);
         let raceMask = Data.IntToHexRace(skinCollection.RaceMask);
         data = `${data}I${Common.GetInventorySlotId(slot)}`;
@@ -209,11 +273,16 @@ export class Data {
         //     data = `${data}Q${skinCollection.QuestIds.join('Q')}`;
         data = `${data}Q123`;
         data = `${data}B15990`;
-        data = `${data}C5`;
+        if(weapon)
+        {
+            data = `${data}W`;
+        }
+        if(camera != 0)
+            data = `${data}C${camera}`;
         // if(skinCollection.BossIds.length > 0)
         //     data = `${data}B${skinCollection.BossIds.join('B')}`;
         // if(skinCollection.Camra != "")
-        //     data = `${data}C${skinCollection.Camra}`;
+       // data = `${data}C0`;
         // if(skinCollection.Unuseable)
         //     data = `${data}U` ;
         // if(skinCollection.Unobtainable)
@@ -239,17 +308,6 @@ export class Data {
         {
             return string.format("%02X", number)
         }
-    }
-
-    public BuildHiddenItemList(slot : string) : string {
-        let data = `15`;
-        data = `${data}I${Common.GetInventorySlotId(slot)}`;
-        data = `${data}S${this.toHex(Common.SourceMask.None)}`;
-        data = `${data}U`;
-        data = `${data}O`;
-        
-        //data = `${data}TH`;
-        return data;
     }
 
     private static IntToHexClass(value: number): string {

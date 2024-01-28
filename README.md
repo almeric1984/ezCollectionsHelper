@@ -13,3 +13,8 @@ This is very much in alpha and should not be used in production. 2.4.4 addon ver
 6) Restart eluna engine
 
 > In order for apply to work correctly you need to use this modified version of mod_transmog https://github.com/almeric1984/mod-transmog
+
+> Camera Info
+> 30 = Any races
+> 3 = Any Sex
+> Class, Subclass match https://www.azerothcore.org/wiki/item_template

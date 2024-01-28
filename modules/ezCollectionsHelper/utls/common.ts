@@ -204,7 +204,20 @@ export namespace Common {
         public FakeEntry: number;
         public Slot: number;
     }
-
+    export class Camera {
+        public Id: number;
+        public Name: string;
+        public Anim: number;
+        public Option: number;
+        public Race : number;
+        public Sex : number;
+        public X: number;
+        public Y: number;
+        public Z: number;
+        public F: number;
+        public Class: number;
+        public SubClass: number;
+    }
     export class SkinCollectionList {
         public Id: number;
         public Name: string;

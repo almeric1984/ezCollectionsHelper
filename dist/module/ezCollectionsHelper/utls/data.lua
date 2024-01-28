@@ -11,10 +11,13 @@ local Data = ____exports.Data
 Data.name = "Data"
 function Data.prototype.____constructor(self)
     self.skinCollectionCache = {}
+    self.camaraCache = {}
+    self.camaraQuery = "select id, `option`, race, sex, x,y,z,f, anim, name,class,subclass from custom_ezCollectionsHelperCameras;"
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
     self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\" AND\n        LOWER(name) NOT LIKE \"%%npc equip%%\"; "
     self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
+    self.weaponSlotQuery = "SELECT slot FROM character_inventory WHERE item = %d"
     self.applyTransmogQuery = "INSERT INTO custom_transmogrification (GUID, FakeEntry, Owner) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE FakeEntry = %d"
     self.removeTransmogQuery = "DELETE FROM custom_transmogrification where Owner = %d AND GUID = %d "
 end
@@ -57,6 +60,40 @@ function Data.prototype.CleanTransmogDb(self, playerGuid)
         end
     )
     return true
+end
+function Data.prototype.GetCamaraId(self, option, race, sex, id)
+    return option * 10000000 + race * 100000 + sex * 10000 + id
+end
+function Data.prototype.BuildCameraCache(self)
+    local queryResult = AuthDBQuery(string.format(self.camaraQuery))
+    if queryResult then
+        repeat
+            do
+                local camera = __TS__New(Common.Camera)
+                camera.Id = queryResult:GetInt32(0)
+                camera.Option = queryResult:GetInt32(1)
+                camera.Race = queryResult:GetInt32(2)
+                camera.Sex = queryResult:GetInt32(3)
+                camera.X = queryResult:GetFloat(4)
+                camera.Y = queryResult:GetFloat(5)
+                camera.Z = queryResult:GetFloat(6)
+                camera.F = queryResult:GetFloat(7)
+                camera.Anim = queryResult:GetInt32(8)
+                camera.Name = queryResult:GetString(9)
+                camera.Class = queryResult:GetInt32(10)
+                camera.SubClass = queryResult:GetInt32(11)
+                self.camaraCache[self:GetCamaraId(camera.Option, camera.Race, camera.Sex, camera.Class * 100 + camera.SubClass)] = camera
+            end
+        until not queryResult:NextRow()
+    end
+end
+function Data.prototype.GetCameraList(self)
+    local result = {}
+    for ____, key in ipairs(__TS__ObjectKeys(self.camaraCache)) do
+        local camera = self.camaraCache[key]
+        result[#result + 1] = camera
+    end
+    return result
 end
 function Data.prototype.GetSkinCollectionList(self)
     local result = {}
@@ -106,9 +143,20 @@ function Data.prototype.GetCurrentTransmog(self, playerGuid)
                 skinsOwned.RealEntry = queryResult:GetInt32(2)
                 skinsOwned.Slot = 0
                 if self.skinCollectionCache[skinsOwned.RealEntry] ~= nil then
-                    skinsOwned.Slot = self.skinCollectionCache[skinsOwned.RealEntry].Slot
+                    if self.skinCollectionCache[skinsOwned.RealEntry].Class == 2 or self.skinCollectionCache[skinsOwned.RealEntry].Class == 4 and self.skinCollectionCache[skinsOwned.RealEntry].SubClass == Common.ArmorTypes.SHIELD then
+                        local weaponSlotQuery = CharDBQuery(string.format(self.weaponSlotQuery, skinsOwned.GUID))
+                        if weaponSlotQuery then
+                            repeat
+                                do
+                                    skinsOwned.Slot = weaponSlotQuery:GetInt32(0) + 1
+                                end
+                            until not weaponSlotQuery:NextRow()
+                        end
+                    else
+                        skinsOwned.Slot = self.skinCollectionCache[skinsOwned.RealEntry].Slot
+                    end
+                    result[#result + 1] = skinsOwned
                 end
-                result[#result + 1] = skinsOwned
             end
         until not queryResult:NextRow()
     end
@@ -124,7 +172,6 @@ function Data.prototype.GetAccountUnlockedAppearances(self, accountId)
             end
         until not queryResult:NextRow()
     end
-    result[#result + 1] = 15
     return result
 end
 function Data.prototype.SearchAppearances(self, query, slot, accountId)
@@ -135,7 +182,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
             if skinCollection.Slot ~= Common:GetInventorySlotId(slot) then
                 if slot == "SHIELD" or slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
                 else
-                    goto __continue25
+                    goto __continue36
                 end
             end
             if #query == 0 or query == nil then
@@ -149,38 +196,66 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
                 end
             end
         end
-        ::__continue25::
+        ::__continue36::
     end
     return result
 end
-function Data.prototype.PackSkinCollectionList(self, slot)
+function Data.prototype.PackSkinCollectionList(self, slot, player)
     local result = {}
     for ____, key in ipairs(__TS__ObjectKeys(self.skinCollectionCache)) do
         local skinCollection = self.skinCollectionCache[key]
         local data = tostring(skinCollection.Id)
+        local camera = 0
+        local cameraId = self:GetCamaraId(
+            1,
+            player:GetRace(),
+            player:GetGender(),
+            skinCollection.Class * 100 + skinCollection.SubClass
+        )
+        if self.camaraCache[cameraId] ~= nil then
+            camera = cameraId
+        else
+            cameraId = self:GetCamaraId(1, 30, 3, skinCollection.Class * 100 + skinCollection.SubClass)
+            if self.camaraCache[cameraId] ~= nil then
+                camera = cameraId
+            end
+        end
         if skinCollection.Slot == Common:GetInventorySlotId(slot) then
-            data = self:BuildSkinCollectionString(skinCollection, data, slot)
+            data = self:BuildSkinCollectionString(skinCollection, data, slot, camera)
             result[#result + 1] = data
         elseif Common:GetInventorySlotId(slot) == 0 then
             if slot == "SHIELD" and skinCollection.Class == 4 and skinCollection.SubClass == Common.ArmorTypes.SHIELD then
-                data = self:BuildSkinCollectionString(skinCollection, data, slot)
+                data = self:BuildSkinCollectionString(skinCollection, data, slot, camera)
                 result[#result + 1] = data
             elseif slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
-                data = self:BuildSkinCollectionString(skinCollection, data, slot)
+                data = self:BuildSkinCollectionString(
+                    skinCollection,
+                    data,
+                    slot,
+                    camera,
+                    true
+                )
                 result[#result + 1] = data
             end
         end
     end
-    result[#result + 1] = self:BuildHiddenItemList(slot)
     return result
 end
-function Data.prototype.BuildSkinCollectionString(self, skinCollection, data, slot)
+function Data.prototype.BuildSkinCollectionString(self, skinCollection, data, slot, camera, weapon)
+    if weapon == nil then
+        weapon = false
+    end
     local classMask = ____exports.Data:IntToHexClass(skinCollection.ClassMask)
     local raceMask = ____exports.Data:IntToHexRace(skinCollection.RaceMask)
     data = (data .. "I") .. tostring(Common:GetInventorySlotId(slot))
     data = data .. "Q123"
     data = data .. "B15990"
-    data = data .. "C5"
+    if weapon then
+        data = data .. "W"
+    end
+    if camera ~= 0 then
+        data = (data .. "C") .. tostring(camera)
+    end
     data = (data .. "A") .. tostring(Common:MaterialToArmorType(skinCollection.Type))
     local sourceMask = self:toHex(Common.SourceMask.None)
     data = (data .. "S") .. sourceMask
@@ -194,14 +269,6 @@ function Data.prototype.toHex(self, number)
     else
         return string.format("%02X", number)
     end
-end
-function Data.prototype.BuildHiddenItemList(self, slot)
-    local data = "15"
-    data = (data .. "I") .. tostring(Common:GetInventorySlotId(slot))
-    data = (data .. "S") .. self:toHex(Common.SourceMask.None)
-    data = data .. "U"
-    data = data .. "O"
-    return data
 end
 function Data.IntToHexClass(self, value)
     if value == 32767 or value == 262143 then

@@ -19,8 +19,10 @@ class Core {
                 messageHandler.Send(sender, `SERVERVERSION:${Common.Settings.addonVersion}:OK`, Common.Settings.addonPrefix)
                 messageHandler.Send(sender, `CACHEVERSION:${Common.Settings.addonCacheVersion}`, Common.Settings.addonPrefix)
                 messageHandler.Send(sender, "COLLECTIONS:SKIN:OWNEDITEM:END", Common.Settings.addonPrefix)
+                messageHandler.Send(sender, "HIDEVISUALSLOTS:HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT", Common.Settings.addonPrefix)
             }
             else if (request.command == "LIST" && request.subCommand == "ALL") {
+                this.BuildCameraDataList(request, messageHandler, sender);
                 this.BuildCollectionList(request, messageHandler, sender);
             }
             else if (request.command == "LIST" && request.subCommand == "SKIN") {
@@ -111,6 +113,7 @@ class Core {
     constructor() {
         this.Data = new Data();
         this.Data.GetConfig()
+        this.Data.BuildCameraCache();
         Common.Settings.Config = Common.LoadConfig();
         print("Initializing EZCollectionsHelper")
         this.Data.GetSkinCollectionList();
@@ -146,8 +149,8 @@ class Core {
         let take = 0;
         let searchQuery = Common.DataToSearchQuery(data);
         let results = this.Data.SearchAppearances(searchQuery.query, searchQuery.slot, sender.GetAccountId());
-        let responce = `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:RESULTS:15:`;
-        messageHandler.Send(sender, `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:OK:${results.length + 1}`, Common.Settings.addonPrefix);
+        let responce = `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:RESULTS:`;
+        messageHandler.Send(sender, `TRANSMOGRIFY:SEARCH:${searchQuery.type}:${searchQuery.token}:OK:${results.length }`, Common.Settings.addonPrefix);
         for (let i = 0; i < results.length; i++) {
             if (take > 30) {
                 messageHandler.Send(sender, responce, Common.Settings.addonPrefix);
@@ -164,7 +167,7 @@ class Core {
     private BuildOwnedSkinList(request: Common.Request, sender: Player, messageHandler: MessageHandler) {
         let take = 0;
         let slot = request.data as string;
-        let responce = `LIST:SKIN:15:`;
+        let responce = `LIST:SKIN:`;
         let slotItems = this.Data.GetAccountUnlockedAppearances(sender.GetAccountId());
         for (let i = 0; i < slotItems.length; i++) {
             if (take == 10) {
@@ -185,7 +188,7 @@ class Core {
         let take = 0;
         let slot = request.data as string;
         let responce = `LIST:ALL:${slot}:`;
-        let slotItems = this.Data.PackSkinCollectionList(slot);
+        let slotItems = this.Data.PackSkinCollectionList(slot,sender);
         // loop though PackSkinCollectionList and send 5 items at a time
         for (let i = 0; i < slotItems.length; i++) {
             if (take == 10) {
@@ -200,6 +203,27 @@ class Core {
         //send remaining items
         messageHandler.Send(sender, responce, Common.Settings.addonPrefix);
         messageHandler.Send(sender, `LIST:ALL:${slot}:END`, Common.Settings.addonPrefix);
+    }
+    private BuildCameraDataList(request: Common.Request, messageHandler: MessageHandler, sender: Player) {
+        let take = 0;
+        let slot = request.data as string;
+        let cameras = this.Data.GetCameraList();
+        let responce = `LIST:DATA:CAMERAS:`;
+        // loop though PackSkinCollectionList and send 5 items at a time
+        for (let i = 0; i < cameras.length; i++) {
+            let c = cameras[i];
+            if (take == 10) {
+                messageHandler.Send(sender, responce, Common.Settings.addonPrefix);
+                responce = `LIST:DATA:CAMERAS:`;
+                take = 0;
+            }
+            responce += `${c.Option},${c.Race},${c.Sex},${(c.Class * 100) + c.SubClass}=${c.X},${c.Y},${c.Z},${c.F},${c.Anim},${c.Name}:`;
+
+            take++;
+        }
+        //send remaining items
+        messageHandler.Send(sender, responce, Common.Settings.addonPrefix);
+        messageHandler.Send(sender, `LIST:DATA:CAMERAS:END`, Common.Settings.addonPrefix);
     }
 }
 

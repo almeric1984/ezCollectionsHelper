@@ -85,6 +85,12 @@ export namespace Common {
         { id: 1024, name: "Draenei" }
     ];
 
+    export class Outfit {
+        public Id: number;
+        public Name: string;
+        public Data : string;
+    }
+
     export enum Quality {
         Poor = 0,
         Common = 1,
@@ -241,6 +247,25 @@ export namespace Common {
         public SubClass: number;
     }
 
+    export function OutfitDatabaseStringToOutfitString(outfitString: string) : string {
+        // Format is slot id slot id slot it. Split by space and then loop through each slot and convert to the correct slot name
+        let outfit = "";
+        //trim space at the end of outfitString
+        outfitString = outfitString.trimEnd();
+        let slots = outfitString.split(" ");
+        for(let i = 0; i < slots.length; i = i + 2) {
+            let slot = tonumber(slots[i]);
+            let entry = tonumber(slots[i+1]);
+            if(entry == 1) 
+                entry = 15;
+            slot = slot +1;
+            
+            outfit += slot + "=" + entry + ",1:";
+        }
+        
+        outfit = outfit.slice(0, -1);
+        return outfit;
+    }
     export function LoadConfig() : TransmogrificationConfig{
 
         let result = new TransmogrificationConfig();

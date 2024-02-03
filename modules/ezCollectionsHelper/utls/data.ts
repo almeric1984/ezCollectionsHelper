@@ -17,7 +17,10 @@ export class Data {
     `SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d`; // %d is the account id
 
     private outfitAddQuery = `INSERT INTO custom_transmogrification_sets (Owner, PresetID, SetName, SetData) VALUES(%d, %d, '%s', '%s')`
-
+    private outfitQuery = "select PresetID, SetName, SetData from custom_transmogrification_sets where Owner = %d";
+    private outfitDeleteQuery = "DELETE FROM custom_transmogrification_sets WHERE Owner = %d AND PresetID = %d";
+    private outfitUpdateQuery = "UPDATE custom_transmogrification_sets SET SetName = '%s', SetData = '%s' WHERE Owner = %d AND PresetID = %d";
+    private outfitRenameQuery = "UPDATE custom_transmogrification_sets SET SetName = '%s' WHERE Owner = %d AND PresetID = %d";
     private lowestIndexOfOutfitQuery = `
     SELECT MIN(MissingPresetId) AS LowestMissingPresetId
     FROM (
@@ -121,7 +124,21 @@ export class Data {
             } while (queryResult.NextRow());
         }
     }
-    public AddOutfit(guid: number, outfitName : string, data: string)
+    public GetOutfits(playerGuid: number) : Common.Outfit[] {
+        let result = [];
+        let queryResult = CharDBQuery(string.format(this.outfitQuery, playerGuid));
+        if (queryResult) {
+            do {
+                let outfit = new Common.Outfit();
+                outfit.Id = queryResult.GetInt32(0);
+                outfit.Name = queryResult.GetString(1);
+                outfit.Data = queryResult.GetString(2);
+                result.push(outfit);
+            } while (queryResult.NextRow());
+        }
+        return result;
+    }
+    public AddOutfit(guid: number, outfitName : string, data: string) : number
     {
         let lowestIndexQuery = CharDBQuery(string.format(this.lowestIndexOfOutfitQuery, guid,guid,guid));
         let lowestIndex = -1;
@@ -133,8 +150,24 @@ export class Data {
         {
             CharDBQuery(string.format(this.outfitAddQuery, guid, lowestIndex, outfitName, data));
         }
+        return lowestIndex;
     }
-
+    public RenameOutfit(guid: number, outfitId: number, outfitName : string) : boolean
+    {
+        CharDBQuery(string.format(this.outfitRenameQuery, outfitName, guid, outfitId));
+        return true;
+    }
+    public UpdateOutfit(guid: number, outfitId: number, outfitName : string, data: string) : boolean
+    {
+        CharDBQuery(string.format(this.outfitUpdateQuery, outfitName, data, guid, outfitId));
+        return true;
+    }
+    public DeleteOutfit(guid: number, outfitId: number) : boolean
+    {
+        CharDBQuery(string.format(this.outfitDeleteQuery, guid, outfitId));
+        return true;
+    }
+    
     public GetCameraList() : Common.Camera[]  {
         let result = [];
         for (let key of Object.keys(this.camaraCache)) {

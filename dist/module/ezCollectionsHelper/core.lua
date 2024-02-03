@@ -13,7 +13,6 @@ Core.name = "Core"
 function Core.prototype.____constructor(self)
     self.OnAddonMessage = function(____, event, sender, ____type, prefix, message, target)
         if prefix == "ezCollections" then
-            print(message)
             local messageHandler = __TS__New(MessageHandler)
             local request = __TS__New(Common.Request, message)
             if request.command == "VERSION" and request.subCommand == Common.Settings.addonVersion then
@@ -21,11 +20,26 @@ function Core.prototype.____constructor(self)
                 messageHandler:Send(sender, "CACHEVERSION:" .. Common.Settings.addonCacheVersion, Common.Settings.addonPrefix)
                 messageHandler:Send(sender, "COLLECTIONS:SKIN:OWNEDITEM:END", Common.Settings.addonPrefix)
                 messageHandler:Send(sender, "HIDEVISUALSLOTS:HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT", Common.Settings.addonPrefix)
+                messageHandler:Send(sender, "OUTFITPARAMS:10:0:0:0", Common.Settings.addonPrefix)
             elseif request.command == "LIST" and request.subCommand == "ALL" then
                 self:BuildCameraDataList(request, messageHandler, sender)
                 self:BuildCollectionList(request, messageHandler, sender)
             elseif request.command == "LIST" and request.subCommand == "SKIN" then
                 self:BuildOwnedSkinList(request, sender, messageHandler)
+                local outfits = self.Data:GetOutfits(sender:GetGUIDLow())
+                do
+                    local i = 0
+                    while i < #outfits do
+                        local outfit = outfits[i + 1]
+                        local outfitString = Common:OutfitDatabaseStringToOutfitString(outfit.Data)
+                        messageHandler:Send(
+                            sender,
+                            (((("TRANSMOGRIFY:OUTFIT:ADD:" .. tostring(outfit.Id)) .. ":") .. outfit.Name) .. ":0:") .. outfitString,
+                            Common.Settings.addonPrefix
+                        )
+                        i = i + 1
+                    end
+                end
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "OUTFIT" then
                 local data = request.data
                 if data[1] == "COST" then
@@ -39,12 +53,10 @@ function Core.prototype.____constructor(self)
                             do
                                 local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
                                 if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
-                                    goto __continue10
+                                    goto __continue11
                                 end
-                                local itemPrice = self:GetTransmogCost(newSkin)
-                                price = price + itemPrice
                             end
-                            ::__continue10::
+                            ::__continue11::
                             i = i + 1
                         end
                     end
@@ -54,7 +66,79 @@ function Core.prototype.____constructor(self)
                         Common.Settings.addonPrefix
                     )
                 end
-                if data[1] == "ADD" then
+                if data[1] == "EDITCOST" then
+                    local outfitId = data[2]
+                    local outfitName = data[3]
+                    local token = data[4]
+                    __TS__ArraySplice(data, 0, 4)
+                    local price = 0
+                    do
+                        local i = 0
+                        while i < #data do
+                            do
+                                local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
+                                if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
+                                    goto __continue14
+                                end
+                            end
+                            ::__continue14::
+                            i = i + 1
+                        end
+                    end
+                    messageHandler:Send(
+                        sender,
+                        (((("TRANSMOGRIFY:OUTFIT:EDITCOST:OK:" .. outfitId) .. ":") .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
+                        Common.Settings.addonPrefix
+                    )
+                elseif data[1] == "EDIT" then
+                    local outfitId = data[2]
+                    local outfitName = data[3]
+                    local token = data[4]
+                    __TS__ArraySplice(data, 0, 4)
+                    local price = 0
+                    local outfitString = ""
+                    do
+                        local i = 0
+                        while i < #data do
+                            do
+                                local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
+                                if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
+                                    outfitString = outfitString .. tostring(tonumber(slot) - 1) .. " 1 "
+                                    goto __continue17
+                                else
+                                    outfitString = outfitString .. ((tostring(tonumber(slot) - 1) .. " ") .. newSkin) .. " "
+                                end
+                            end
+                            ::__continue17::
+                            i = i + 1
+                        end
+                    end
+                    self.Data:UpdateOutfit(
+                        sender:GetGUIDLow(),
+                        tonumber(outfitId),
+                        outfitName,
+                        outfitString
+                    )
+                    outfitString = Common:OutfitDatabaseStringToOutfitString(outfitString)
+                    messageHandler:Send(sender, (("TRANSMOGRIFY:OUTFIT:EDIT:OK:" .. outfitId) .. ":0:0:") .. outfitString, Common.Settings.addonPrefix)
+                    local outfits = self.Data:GetOutfits(sender:GetGUIDLow())
+                    do
+                        local i = 0
+                        while i < #outfits do
+                            local outfit = outfits[i + 1]
+                            if outfit.Id == tonumber(outfitId) then
+                                local outfitString = Common:OutfitDatabaseStringToOutfitString(outfit.Data)
+                                messageHandler:Send(
+                                    sender,
+                                    (((("TRANSMOGRIFY:OUTFIT:ADD:" .. tostring(outfit.Id)) .. ":") .. outfit.Name) .. ":0:") .. outfitString,
+                                    Common.Settings.addonPrefix
+                                )
+                                break
+                            end
+                            i = i + 1
+                        end
+                    end
+                elseif data[1] == "ADD" then
                     local outfitName = data[2]
                     local token = data[3]
                     __TS__ArraySplice(data, 0, 3)
@@ -67,36 +151,68 @@ function Core.prototype.____constructor(self)
                                 local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
                                 if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
                                     outfitString = outfitString .. tostring(tonumber(slot) - 1) .. " 1 "
-                                    goto __continue13
+                                    goto __continue23
                                 else
                                     outfitString = outfitString .. ((tostring(tonumber(slot) - 1) .. " ") .. newSkin) .. " "
                                 end
-                                local itemPrice = self:GetTransmogCost(newSkin)
-                                price = price + itemPrice
                             end
-                            ::__continue13::
+                            ::__continue23::
                             i = i + 1
                         end
                     end
-                    if sender:GetCoinage() < price then
-                        messageHandler:Send(
-                            sender,
-                            ("TRANSMOGRIFY:OUTFIT:ADD:FAIL:" .. tostring(price)) .. ":0:0:0:Insufficient funds",
-                            Common.Settings.addonPrefix
-                        )
-                    else
-                        sender:ModifyMoney(-price)
-                        self.Data:AddOutfit(
-                            sender:GetGUIDLow(),
-                            outfitName,
-                            outfitString
-                        )
-                        messageHandler:Send(
-                            sender,
-                            (("TRANSMOGRIFY:OUTFIT:ADD:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
-                            Common.Settings.addonPrefix
-                        )
-                        sender:ModifyMoney(-price)
+                    local outfitIndex = self.Data:AddOutfit(
+                        sender:GetGUIDLow(),
+                        outfitName,
+                        outfitString
+                    )
+                    messageHandler:Send(
+                        sender,
+                        (("TRANSMOGRIFY:OUTFIT:ADD:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
+                        Common.Settings.addonPrefix
+                    )
+                    outfitString = Common:OutfitDatabaseStringToOutfitString(outfitString)
+                    messageHandler:Send(
+                        sender,
+                        (((("TRANSMOGRIFY:OUTFIT:ADD:" .. tostring(outfitIndex)) .. ":") .. outfitName) .. ":0:") .. outfitString,
+                        Common.Settings.addonPrefix
+                    )
+                elseif data[1] == "REMOVE" then
+                    local outfitId = tonumber(data[2])
+                    self.Data:DeleteOutfit(
+                        sender:GetGUIDLow(),
+                        outfitId
+                    )
+                    messageHandler:Send(sender, "TRANSMOGRIFY:OUTFIT:REMOVE:OK", Common.Settings.addonPrefix)
+                    messageHandler:Send(
+                        sender,
+                        ("TRANSMOGRIFY:OUTFIT:REMOVE:" .. tostring(outfitId)) .. ":",
+                        Common.Settings.addonPrefix
+                    )
+                elseif data[1] == "RENAME" then
+                    local outfitId = tonumber(data[2])
+                    local newName = data[3]
+                    self.Data:RenameOutfit(
+                        sender:GetGUIDLow(),
+                        outfitId,
+                        newName
+                    )
+                    local outfits = self.Data:GetOutfits(sender:GetGUIDLow())
+                    messageHandler:Send(sender, "TRANSMOGRIFY:OUTFIT:RENAME:OK", Common.Settings.addonPrefix)
+                    do
+                        local i = 0
+                        while i < #outfits do
+                            local outfit = outfits[i + 1]
+                            if outfits[i + 1].Id == outfitId then
+                                local outfitString = Common:OutfitDatabaseStringToOutfitString(outfit.Data)
+                                messageHandler:Send(
+                                    sender,
+                                    (((("TRANSMOGRIFY:OUTFIT:ADD:" .. tostring(outfit.Id)) .. ":") .. outfit.Name) .. ":0:") .. outfitString,
+                                    Common.Settings.addonPrefix
+                                )
+                                break
+                            end
+                            i = i + 1
+                        end
                     end
                 end
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "COST" then
@@ -108,12 +224,12 @@ function Core.prototype.____constructor(self)
                         do
                             local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
                             if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
-                                goto __continue19
+                                goto __continue31
                             end
                             local itemPrice = self:GetTransmogCost(newSkin)
                             price = price + itemPrice
                         end
-                        ::__continue19::
+                        ::__continue31::
                         i = i + 1
                     end
                 end

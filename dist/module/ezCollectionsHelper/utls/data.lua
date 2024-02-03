@@ -16,6 +16,10 @@ function Data.prototype.____constructor(self)
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
     self.outfitAddQuery = "INSERT INTO custom_transmogrification_sets (Owner, PresetID, SetName, SetData) VALUES(%d, %d, '%s', '%s')"
+    self.outfitQuery = "select PresetID, SetName, SetData from custom_transmogrification_sets where Owner = %d"
+    self.outfitDeleteQuery = "DELETE FROM custom_transmogrification_sets WHERE Owner = %d AND PresetID = %d"
+    self.outfitUpdateQuery = "UPDATE custom_transmogrification_sets SET SetName = '%s', SetData = '%s' WHERE Owner = %d AND PresetID = %d"
+    self.outfitRenameQuery = "UPDATE custom_transmogrification_sets SET SetName = '%s' WHERE Owner = %d AND PresetID = %d"
     self.lowestIndexOfOutfitQuery = "\n    SELECT MIN(MissingPresetId) AS LowestMissingPresetId\n    FROM (\n        SELECT MIN(PresetId) + 1 AS MissingPresetId\n        FROM custom_transmogrification_sets t1\n        WHERE NOT EXISTS (\n            SELECT 1\n            FROM custom_transmogrification_sets t2\n            WHERE t2.PresetId = t1.PresetId + 1 AND `owner` = %d\n        )\n        UNION\n        SELECT \n            CASE\n                WHEN (SELECT MIN(PresetId) FROM custom_transmogrification_sets WHERE `owner` = %d) >= 1 THEN\n                    (SELECT MIN(PresetId) - 1 FROM custom_transmogrification_sets WHERE `owner` = %d)\n                ELSE\n                    null\n            END AS MissingPresetId\n    ) AS MissingPresets;"
     self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\" AND\n        LOWER(name) NOT LIKE \"%%npc equip%%\"; "
     self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
@@ -89,6 +93,22 @@ function Data.prototype.BuildCameraCache(self)
         until not queryResult:NextRow()
     end
 end
+function Data.prototype.GetOutfits(self, playerGuid)
+    local result = {}
+    local queryResult = CharDBQuery(string.format(self.outfitQuery, playerGuid))
+    if queryResult then
+        repeat
+            do
+                local outfit = __TS__New(Common.Outfit)
+                outfit.Id = queryResult:GetInt32(0)
+                outfit.Name = queryResult:GetString(1)
+                outfit.Data = queryResult:GetString(2)
+                result[#result + 1] = outfit
+            end
+        until not queryResult:NextRow()
+    end
+    return result
+end
 function Data.prototype.AddOutfit(self, guid, outfitName, data)
     local lowestIndexQuery = CharDBQuery(string.format(self.lowestIndexOfOutfitQuery, guid, guid, guid))
     local lowestIndex = -1
@@ -106,6 +126,25 @@ function Data.prototype.AddOutfit(self, guid, outfitName, data)
             data
         ))
     end
+    return lowestIndex
+end
+function Data.prototype.RenameOutfit(self, guid, outfitId, outfitName)
+    CharDBQuery(string.format(self.outfitRenameQuery, outfitName, guid, outfitId))
+    return true
+end
+function Data.prototype.UpdateOutfit(self, guid, outfitId, outfitName, data)
+    CharDBQuery(string.format(
+        self.outfitUpdateQuery,
+        outfitName,
+        data,
+        guid,
+        outfitId
+    ))
+    return true
+end
+function Data.prototype.DeleteOutfit(self, guid, outfitId)
+    CharDBQuery(string.format(self.outfitDeleteQuery, guid, outfitId))
+    return true
 end
 function Data.prototype.GetCameraList(self)
     local result = {}
@@ -202,7 +241,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
             if skinCollection.Slot ~= Common:GetInventorySlotId(slot) then
                 if slot == "SHIELD" or slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
                 else
-                    goto __continue39
+                    goto __continue45
                 end
             end
             if #query == 0 or query == nil then
@@ -216,7 +255,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
                 end
             end
         end
-        ::__continue39::
+        ::__continue45::
     end
     return result
 end

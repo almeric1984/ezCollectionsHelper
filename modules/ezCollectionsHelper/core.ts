@@ -13,7 +13,7 @@ class Core {
         target: number | Player | Guild | Group
     ) => {
         if (prefix == "ezCollections") {
-            print(message)
+          //  print(message)
             let messageHandler = new MessageHandler()
             let request = new Common.Request(message)
             if (request.command == "VERSION" && request.subCommand == Common.Settings.addonVersion) {
@@ -21,6 +21,7 @@ class Core {
                 messageHandler.Send(sender, `CACHEVERSION:${Common.Settings.addonCacheVersion}`, Common.Settings.addonPrefix)
                 messageHandler.Send(sender, "COLLECTIONS:SKIN:OWNEDITEM:END", Common.Settings.addonPrefix)
                 messageHandler.Send(sender, "HIDEVISUALSLOTS:HEAD:SHOULDER:BACK:CHEST:TABARD:SHIRT:WRIST:HANDS:WAIST:LEGS:FEET:MAINHAND:OFFHAND:RANGED:MISC:ENCHANT", Common.Settings.addonPrefix)
+                messageHandler.Send(sender, "OUTFITPARAMS:10:0:0:0", Common.Settings.addonPrefix)
             }
             else if (request.command == "LIST" && request.subCommand == "ALL") {
                 this.BuildCameraDataList(request, messageHandler, sender);
@@ -28,6 +29,13 @@ class Core {
             }
             else if (request.command == "LIST" && request.subCommand == "SKIN") {
                 this.BuildOwnedSkinList(request, sender, messageHandler);
+                // Send Outfits here
+                let outfits = this.Data.GetOutfits(sender.GetGUIDLow());
+                for (let i = 0; i < outfits.length; i++) {
+                    let outfit = outfits[i];
+                    let outfitString = Common.OutfitDatabaseStringToOutfitString(outfit.Data);
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:${outfit.Id}:${outfit.Name}:0:${outfitString}`, Common.Settings.addonPrefix)
+                }
             }
             else if(request.command == "TRANSMOGRIFY" && request.subCommand == "OUTFIT") {
                 let data = request.data as string[];
@@ -41,12 +49,59 @@ class Core {
                         let [slot, newSkin]   = data[i].split("=")
                         if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
                             continue;
-                        let itemPrice = this.GetTransmogCost(newSkin);             
-                        price += itemPrice;
                     }
                     messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:COST:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
                 }
-                if(data[0] == "ADD")
+                if(data[0] == "EDITCOST")
+                {
+                    let outfitId = data[1];
+                    let outfitName = data[2];
+                    let token = data[3];
+                    data.splice(0, 4);
+                    let price = 0;
+                    for (let i = 0; i < data.length; i++) {
+                        let [slot, newSkin]   = data[i].split("=")
+                        if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
+                            continue;
+                    }
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:EDITCOST:OK:${outfitId}:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                }
+                else if(data[0] == "EDIT")
+                {
+                    let outfitId = data[1];
+                    let outfitName = data[2];
+                    let token = data[3];
+                    data.splice(0, 4);
+                    let price = 0;
+                    let outfitString = "";
+                    for (let i = 0; i < data.length; i++) {
+                        let [slot, newSkin]   = data[i].split("=")
+                        if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
+                        {
+                            outfitString += `${tonumber(slot) - 1} 1 `;
+                            continue;
+                        }
+                        else
+                            outfitString += `${tonumber(slot) - 1} ${newSkin} `;
+                    }
+                    this.Data.UpdateOutfit(sender.GetGUIDLow(), tonumber(outfitId), outfitName, outfitString);
+                    //Converts the outfit string back into something the addon can understand
+                    outfitString = Common.OutfitDatabaseStringToOutfitString(outfitString);
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:EDIT:OK:${outfitId}:0:0:${outfitString}`, Common.Settings.addonPrefix)
+
+                    let outfits = this.Data.GetOutfits(sender.GetGUIDLow());
+                    for(let i = 0; i < outfits.length; i++)
+                    {
+                        let outfit = outfits[i];
+                        if(outfit.Id == tonumber(outfitId))
+                        {
+                            let outfitString = Common.OutfitDatabaseStringToOutfitString(outfit.Data);
+                            messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:${outfit.Id}:${outfit.Name}:0:${outfitString}`, Common.Settings.addonPrefix)
+                            break;
+                        }
+                    }
+                }
+                else if(data[0] == "ADD")
                 {
                     let outfitName = data[1];
                     let token = data[2];
@@ -63,23 +118,43 @@ class Core {
                         }
                         else
                             outfitString += `${tonumber(slot) - 1} ${newSkin} `;
-                        let itemPrice = this.GetTransmogCost(newSkin); 
-                        price += itemPrice;            
                     }
-                    if(sender.GetCoinage() < price)
-                    {
-                        // Fails if player doesn't have enough gold
-                        // This will just stop the transmog from happening will not throw an error
-                        messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:FAIL:${price}:0:0:0:Insufficient funds`, Common.Settings.addonPrefix)
-                    }
-                    else
-                    {
-                        sender.ModifyMoney(-price);
-                        this.Data.AddOutfit(sender.GetGUIDLow(), outfitName, outfitString);
-                        messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
-                        sender.ModifyMoney(-price);
-                    }
+                    
+                    let outfitIndex = this.Data.AddOutfit(sender.GetGUIDLow(), outfitName, outfitString);
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                    //Converts the outfit string back into something the addon can understand
+                    outfitString = Common.OutfitDatabaseStringToOutfitString(outfitString);
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:${outfitIndex}:${outfitName}:0:${outfitString}`, Common.Settings.addonPrefix)
                 }
+                else if(data[0] == "REMOVE")
+                {
+                    let outfitId = tonumber(data[1]);
+                    this.Data.DeleteOutfit(sender.GetGUIDLow(), outfitId);
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:REMOVE:OK`, Common.Settings.addonPrefix)
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:REMOVE:${outfitId}:`, Common.Settings.addonPrefix)
+                }
+                else if(data[0] == "RENAME")
+                {
+                    
+                    let outfitId = tonumber(data[1]);
+                    let newName = data[2];
+                    this.Data.RenameOutfit(sender.GetGUIDLow(), outfitId, newName);
+                    let outfits = this.Data.GetOutfits(sender.GetGUIDLow());
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:RENAME:OK`, Common.Settings.addonPrefix)
+                    for(let i = 0; i < outfits.length; i++)
+                    {
+                        let outfit = outfits[i];
+                        if(outfits[i].Id == outfitId)
+                        {
+                            let outfitString = Common.OutfitDatabaseStringToOutfitString(outfit.Data);
+                            messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:${outfit.Id}:${outfit.Name}:0:${outfitString}`, Common.Settings.addonPrefix)
+                            break;
+                        }
+                    }
+            
+                }
+
+
             }
             else if(request.command == "TRANSMOGRIFY" && request.subCommand == "COST") {
                 let data = request.data as string[];

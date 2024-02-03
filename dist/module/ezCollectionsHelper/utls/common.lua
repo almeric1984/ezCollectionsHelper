@@ -3,9 +3,9 @@ local __TS__Class = ____lualib.__TS__Class
 local __TS__New = ____lualib.__TS__New
 local __TS__StringSplit = ____lualib.__TS__StringSplit
 local __TS__ArraySlice = ____lualib.__TS__ArraySlice
+local __TS__StringTrimEnd = ____lualib.__TS__StringTrimEnd
 local __TS__StringReplace = ____lualib.__TS__StringReplace
 local __TS__StringTrimStart = ____lualib.__TS__StringTrimStart
-local __TS__StringTrimEnd = ____lualib.__TS__StringTrimEnd
 local ____exports = {}
 ____exports.Common = {}
 local Common = ____exports.Common
@@ -94,6 +94,11 @@ do
         {id = 512, name = "Blood Elf"},
         {id = 1024, name = "Draenei"}
     }
+    Common.Outfit = __TS__Class()
+    local Outfit = Common.Outfit
+    Outfit.name = "Outfit"
+    function Outfit.prototype.____constructor(self)
+    end
     Common.Quality = Quality or ({})
     Common.Quality.Poor = 0
     Common.Quality[Common.Quality.Poor] = "Poor"
@@ -218,17 +223,17 @@ do
     end
     function Common.MaterialToArmorType(self, material)
         repeat
-            local ____switch22 = material
-            local ____cond22 = ____switch22 == 7
-            if ____cond22 then
+            local ____switch23 = material
+            local ____cond23 = ____switch23 == 7
+            if ____cond23 then
                 return 1
             end
-            ____cond22 = ____cond22 or ____switch22 == 6
-            if ____cond22 then
+            ____cond23 = ____cond23 or ____switch23 == 6
+            if ____cond23 then
                 return 4
             end
-            ____cond22 = ____cond22 or ____switch22 == 5
-            if ____cond22 then
+            ____cond23 = ____cond23 or ____switch23 == 5
+            if ____cond23 then
                 return 3
             end
             do
@@ -275,6 +280,26 @@ do
         self.SourceMask = 0
         self.RaceMask = 0
         self.ClassMask = 0
+    end
+    function Common.OutfitDatabaseStringToOutfitString(self, outfitString)
+        local outfit = ""
+        outfitString = __TS__StringTrimEnd(outfitString)
+        local slots = __TS__StringSplit(outfitString, " ")
+        do
+            local i = 0
+            while i < #slots do
+                local slot = tonumber(slots[i + 1])
+                local entry = tonumber(slots[i + 1 + 1])
+                if entry == 1 then
+                    entry = 15
+                end
+                slot = slot + 1
+                outfit = outfit .. ((tostring(slot) .. "=") .. tostring(entry)) .. ",1:"
+                i = i + 2
+            end
+        end
+        outfit = string.sub(outfit, 1, -2)
+        return outfit
     end
     function Common.LoadConfig(self)
         local result = __TS__New(Common.TransmogrificationConfig)

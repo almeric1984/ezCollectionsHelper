@@ -1,6 +1,7 @@
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local __TS__New = ____lualib.__TS__New
+local __TS__ArraySplice = ____lualib.__TS__ArraySplice
 local __TS__StringSplit = ____lualib.__TS__StringSplit
 local ____exports = {}
 local ____data = require("ezCollectionsHelper.utls.data")
@@ -12,6 +13,7 @@ Core.name = "Core"
 function Core.prototype.____constructor(self)
     self.OnAddonMessage = function(____, event, sender, ____type, prefix, message, target)
         if prefix == "ezCollections" then
+            print(message)
             local messageHandler = __TS__New(MessageHandler)
             local request = __TS__New(Common.Request, message)
             if request.command == "VERSION" and request.subCommand == Common.Settings.addonVersion then
@@ -24,6 +26,50 @@ function Core.prototype.____constructor(self)
                 self:BuildCollectionList(request, messageHandler, sender)
             elseif request.command == "LIST" and request.subCommand == "SKIN" then
                 self:BuildOwnedSkinList(request, sender, messageHandler)
+            elseif request.command == "TRANSMOGRIFY" and request.subCommand == "OUTFIT" then
+                local data = request.data
+                if data[1] == "COST" then
+                    local outfitName = data[2]
+                    local token = data[3]
+                    __TS__ArraySplice(data, 0, 3)
+                    local price = 0
+                    do
+                        local i = 0
+                        while i < #data do
+                            do
+                                local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
+                                if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
+                                    goto __continue10
+                                end
+                                local itemPrice = self:GetTransmogCost(newSkin)
+                                price = price + itemPrice
+                            end
+                            ::__continue10::
+                            i = i + 1
+                        end
+                    end
+                    messageHandler:Send(
+                        sender,
+                        (("TRANSMOGRIFY:OUTFIT:COST:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
+                        Common.Settings.addonPrefix
+                    )
+                end
+                if data[1] == "ADD" then
+                    do
+                        local i = 1
+                        while i < #data do
+                            do
+                                local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
+                                if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
+                                    goto __continue13
+                                end
+                                local itemPrice = self:GetTransmogCost(newSkin)
+                            end
+                            ::__continue13::
+                            i = i + 1
+                        end
+                    end
+                end
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "COST" then
                 local data = request.data
                 local price = 0
@@ -33,12 +79,12 @@ function Core.prototype.____constructor(self)
                         do
                             local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
                             if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
-                                goto __continue9
+                                goto __continue16
                             end
                             local itemPrice = self:GetTransmogCost(newSkin)
                             price = price + itemPrice
                         end
-                        ::__continue9::
+                        ::__continue16::
                         i = i + 1
                     end
                 end
@@ -148,6 +194,11 @@ function Core.prototype.GetCurrentTransmog(self, request, sender, messageHandler
     do
         local i = 0
         while i < #currentTransmog do
+            print(tostring(currentTransmog[i + 1].FakeEntry) .. "FakeEntry")
+            print(tostring(currentTransmog[i + 1].Slot) .. "Slot")
+            if currentTransmog[i + 1].Slot == 16 then
+                currentTransmog[i + 1].Slot = 15
+            end
             if currentTransmog[i + 1].FakeEntry == currentTransmog[i + 1].RealEntry then
                 responce = responce .. ((tostring(currentTransmog[i + 1].Slot - 1) .. "=") .. tostring(currentTransmog[i + 1].RealEntry)) .. ",0,0,0,1:"
             else

@@ -13,6 +13,7 @@ class Core {
         target: number | Player | Guild | Group
     ) => {
         if (prefix == "ezCollections") {
+            print(message)
             let messageHandler = new MessageHandler()
             let request = new Common.Request(message)
             if (request.command == "VERSION" && request.subCommand == Common.Settings.addonVersion) {
@@ -27,6 +28,33 @@ class Core {
             }
             else if (request.command == "LIST" && request.subCommand == "SKIN") {
                 this.BuildOwnedSkinList(request, sender, messageHandler);
+            }
+            else if(request.command == "TRANSMOGRIFY" && request.subCommand == "OUTFIT") {
+                let data = request.data as string[];
+                if(data[0] == "COST")
+                {
+                    let outfitName = data[1];
+                    let token = data[2];
+                    data.splice(0, 3);
+                    let price = 0;
+                    for (let i = 0; i < data.length; i++) {
+                        let [slot, newSkin]   = data[i].split("=")
+                        if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
+                            continue;
+                        let itemPrice = this.GetTransmogCost(newSkin);             
+                        price += itemPrice;
+                    }
+                    messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:COST:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                }
+                if(data[0] == "ADD")
+                {
+                    for (let i = 1; i < data.length; i++) {
+                        let [slot, newSkin]   = data[i].split("=")
+                        if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
+                            continue;
+                        let itemPrice = this.GetTransmogCost(newSkin);             
+                    }
+                }
             }
             else if(request.command == "TRANSMOGRIFY" && request.subCommand == "COST") {
                 let data = request.data as string[];
@@ -136,6 +164,10 @@ class Core {
         let responce = `GETTRANSMOG:ALL:`;
         let currentTransmog = this.Data.GetCurrentTransmog(sender.GetGUIDLow());
         for (let i = 0; i < currentTransmog.length; i++) {
+            print(currentTransmog[i].FakeEntry + "FakeEntry")
+            print(currentTransmog[i].Slot + "Slot")
+            if(currentTransmog[i].Slot == 16)
+                currentTransmog[i].Slot = 15;
             if(currentTransmog[i].FakeEntry == currentTransmog[i].RealEntry)
                 responce += `${currentTransmog[i].Slot - 1}=${currentTransmog[i].RealEntry},0,0,0,1:`;
             else

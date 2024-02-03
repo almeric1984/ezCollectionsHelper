@@ -48,11 +48,36 @@ class Core {
                 }
                 if(data[0] == "ADD")
                 {
-                    for (let i = 1; i < data.length; i++) {
+                    let outfitName = data[1];
+                    let token = data[2];
+                    data.splice(0, 3);
+                    let price = 0;
+                    let outfitString = "";
+                    for (let i = 0; i < data.length; i++) {
                         let [slot, newSkin]   = data[i].split("=")
+                        
                         if(tonumber(newSkin) == -1 || tonumber(newSkin) == 15)
+                        {
+                            outfitString += `${tonumber(slot) - 1} 1 `;
                             continue;
-                        let itemPrice = this.GetTransmogCost(newSkin);             
+                        }
+                        else
+                            outfitString += `${tonumber(slot) - 1} ${newSkin} `;
+                        let itemPrice = this.GetTransmogCost(newSkin); 
+                        price += itemPrice;            
+                    }
+                    if(sender.GetCoinage() < price)
+                    {
+                        // Fails if player doesn't have enough gold
+                        // This will just stop the transmog from happening will not throw an error
+                        messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:FAIL:${price}:0:0:0:Insufficient funds`, Common.Settings.addonPrefix)
+                    }
+                    else
+                    {
+                        sender.ModifyMoney(-price);
+                        this.Data.AddOutfit(sender.GetGUIDLow(), outfitName, outfitString);
+                        messageHandler.Send(sender, `TRANSMOGRIFY:OUTFIT:ADD:OK:${price}:0:${data.join(":")}`, Common.Settings.addonPrefix)
+                        sender.ModifyMoney(-price);
                     }
                 }
             }
@@ -164,8 +189,6 @@ class Core {
         let responce = `GETTRANSMOG:ALL:`;
         let currentTransmog = this.Data.GetCurrentTransmog(sender.GetGUIDLow());
         for (let i = 0; i < currentTransmog.length; i++) {
-            print(currentTransmog[i].FakeEntry + "FakeEntry")
-            print(currentTransmog[i].Slot + "Slot")
             if(currentTransmog[i].Slot == 16)
                 currentTransmog[i].Slot = 15;
             if(currentTransmog[i].FakeEntry == currentTransmog[i].RealEntry)

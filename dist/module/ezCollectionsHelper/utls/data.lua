@@ -15,6 +15,8 @@ function Data.prototype.____constructor(self)
     self.camaraQuery = "select id, `option`, race, sex, x,y,z,f, anim, name,class,subclass from custom_ezCollectionsHelperCameras;"
     self.transmogQuery = "SELECT custom_transmogrification.GUID, FakeEntry, item_instance.itemEntry FROM custom_transmogrification\n\tINNER JOIN item_instance ON custom_transmogrification.GUID = item_instance.guid\n\tWHERE `owner` = %d"
     self.accountQuery = "SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d"
+    self.outfitAddQuery = "INSERT INTO custom_transmogrification_sets (Owner, PresetID, SetName, SetData) VALUES(%d, %d, '%s', '%s')"
+    self.lowestIndexOfOutfitQuery = "\n    SELECT MIN(MissingPresetId) AS LowestMissingPresetId\n    FROM (\n        SELECT MIN(PresetId) + 1 AS MissingPresetId\n        FROM custom_transmogrification_sets t1\n        WHERE NOT EXISTS (\n            SELECT 1\n            FROM custom_transmogrification_sets t2\n            WHERE t2.PresetId = t1.PresetId + 1 AND `owner` = %d\n        )\n        UNION\n        SELECT \n            CASE\n                WHEN (SELECT MIN(PresetId) FROM custom_transmogrification_sets WHERE `owner` = %d) >= 1 THEN\n                    (SELECT MIN(PresetId) - 1 FROM custom_transmogrification_sets WHERE `owner` = %d)\n                ELSE\n                    null\n            END AS MissingPresetId\n    ) AS MissingPresets;"
     self.itemsQuery = "SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass\n        FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND \n        FlagsExtra <> 8192 AND\n        FlagsExtra <> 6299648 AND\n        LOWER(name) NOT LIKE \"%%test %%\" AND\n        LOWER(name) NOT LIKE \"%%npc equip%%\"; "
     self.ConfigQuery = "SELECT Prefix,Version, CacheVersion, ModulesConfPath FROM custom_ezCollectionsHelperConfig where RealmID = %d;"
     self.weaponSlotQuery = "SELECT slot FROM character_inventory WHERE item = %d"
@@ -85,6 +87,24 @@ function Data.prototype.BuildCameraCache(self)
                 self.camaraCache[self:GetCamaraId(camera.Option, camera.Race, camera.Sex, camera.Class * 100 + camera.SubClass)] = camera
             end
         until not queryResult:NextRow()
+    end
+end
+function Data.prototype.AddOutfit(self, guid, outfitName, data)
+    local lowestIndexQuery = CharDBQuery(string.format(self.lowestIndexOfOutfitQuery, guid, guid, guid))
+    local lowestIndex = -1
+    repeat
+        do
+            lowestIndex = lowestIndexQuery:GetInt32(0)
+        end
+    until not lowestIndexQuery:NextRow()
+    if lowestIndex ~= -1 then
+        CharDBQuery(string.format(
+            self.outfitAddQuery,
+            guid,
+            lowestIndex,
+            outfitName,
+            data
+        ))
     end
 end
 function Data.prototype.GetCameraList(self)
@@ -182,7 +202,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
             if skinCollection.Slot ~= Common:GetInventorySlotId(slot) then
                 if slot == "SHIELD" or slot == Common:GetWeaponTypeNameById(skinCollection.SubClass) and skinCollection.Class == 2 then
                 else
-                    goto __continue36
+                    goto __continue39
                 end
             end
             if #query == 0 or query == nil then
@@ -196,7 +216,7 @@ function Data.prototype.SearchAppearances(self, query, slot, accountId)
                 end
             end
         end
-        ::__continue36::
+        ::__continue39::
     end
     return result
 end

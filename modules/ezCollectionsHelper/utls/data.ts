@@ -16,6 +16,28 @@ export class Data {
     private accountQuery =
     `SELECT item_template_id FROM custom_unlocked_appearances WHERE account_id = %d`; // %d is the account id
 
+    private outfitAddQuery = `INSERT INTO custom_transmogrification_sets (Owner, PresetID, SetName, SetData) VALUES(%d, %d, '%s', '%s')`
+
+    private lowestIndexOfOutfitQuery = `
+    SELECT MIN(MissingPresetId) AS LowestMissingPresetId
+    FROM (
+        SELECT MIN(PresetId) + 1 AS MissingPresetId
+        FROM custom_transmogrification_sets t1
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM custom_transmogrification_sets t2
+            WHERE t2.PresetId = t1.PresetId + 1 AND \`owner\` = %d
+        )
+        UNION
+        SELECT 
+            CASE
+                WHEN (SELECT MIN(PresetId) FROM custom_transmogrification_sets WHERE \`owner\` = %d) >= 1 THEN
+                    (SELECT MIN(PresetId) - 1 FROM custom_transmogrification_sets WHERE \`owner\` = %d)
+                ELSE
+                    null
+            END AS MissingPresetId
+    ) AS MissingPresets;`
+
     private itemsQuery = `SELECT entry, InventoryType, Material, AllowableClass, AllowableRace, name, VerifiedBuild, Quality, SellPrice, class, subclass
         FROM item_template where InventoryType > 0 AND InventoryType < 20 AND entry <> 5106 AND 
         FlagsExtra <> 8192 AND
@@ -99,6 +121,20 @@ export class Data {
             } while (queryResult.NextRow());
         }
     }
+    public AddOutfit(guid: number, outfitName : string, data: string)
+    {
+        let lowestIndexQuery = CharDBQuery(string.format(this.lowestIndexOfOutfitQuery, guid,guid,guid));
+        let lowestIndex = -1;
+        do {
+            lowestIndex = lowestIndexQuery.GetInt32(0);
+            
+        } while(lowestIndexQuery.NextRow());
+        if(lowestIndex != -1)
+        {
+            CharDBQuery(string.format(this.outfitAddQuery, guid, lowestIndex, outfitName, data));
+        }
+    }
+
     public GetCameraList() : Common.Camera[]  {
         let result = [];
         for (let key of Object.keys(this.camaraCache)) {

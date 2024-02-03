@@ -55,19 +55,48 @@ function Core.prototype.____constructor(self)
                     )
                 end
                 if data[1] == "ADD" then
+                    local outfitName = data[2]
+                    local token = data[3]
+                    __TS__ArraySplice(data, 0, 3)
+                    local price = 0
+                    local outfitString = ""
                     do
-                        local i = 1
+                        local i = 0
                         while i < #data do
                             do
                                 local slot, newSkin = table.unpack(__TS__StringSplit(data[i + 1], "="))
                                 if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
+                                    outfitString = outfitString .. tostring(tonumber(slot) - 1) .. " 1 "
                                     goto __continue13
+                                else
+                                    outfitString = outfitString .. ((tostring(tonumber(slot) - 1) .. " ") .. newSkin) .. " "
                                 end
                                 local itemPrice = self:GetTransmogCost(newSkin)
+                                price = price + itemPrice
                             end
                             ::__continue13::
                             i = i + 1
                         end
+                    end
+                    if sender:GetCoinage() < price then
+                        messageHandler:Send(
+                            sender,
+                            ("TRANSMOGRIFY:OUTFIT:ADD:FAIL:" .. tostring(price)) .. ":0:0:0:Insufficient funds",
+                            Common.Settings.addonPrefix
+                        )
+                    else
+                        sender:ModifyMoney(-price)
+                        self.Data:AddOutfit(
+                            sender:GetGUIDLow(),
+                            outfitName,
+                            outfitString
+                        )
+                        messageHandler:Send(
+                            sender,
+                            (("TRANSMOGRIFY:OUTFIT:ADD:OK:" .. tostring(price)) .. ":0:") .. table.concat(data, ":"),
+                            Common.Settings.addonPrefix
+                        )
+                        sender:ModifyMoney(-price)
                     end
                 end
             elseif request.command == "TRANSMOGRIFY" and request.subCommand == "COST" then
@@ -79,12 +108,12 @@ function Core.prototype.____constructor(self)
                         do
                             local slotAndEntry, unk1, oldSkin, unk3, newSkin = table.unpack(__TS__StringSplit(data[i + 1], ","))
                             if tonumber(newSkin) == -1 or tonumber(newSkin) == 15 then
-                                goto __continue16
+                                goto __continue19
                             end
                             local itemPrice = self:GetTransmogCost(newSkin)
                             price = price + itemPrice
                         end
-                        ::__continue16::
+                        ::__continue19::
                         i = i + 1
                     end
                 end
@@ -194,8 +223,6 @@ function Core.prototype.GetCurrentTransmog(self, request, sender, messageHandler
     do
         local i = 0
         while i < #currentTransmog do
-            print(tostring(currentTransmog[i + 1].FakeEntry) .. "FakeEntry")
-            print(tostring(currentTransmog[i + 1].Slot) .. "Slot")
             if currentTransmog[i + 1].Slot == 16 then
                 currentTransmog[i + 1].Slot = 15
             end
